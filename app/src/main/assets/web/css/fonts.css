@@ -1,0 +1,6 @@
+@font-face { font-family: BuilderSans; font-weight: 400; src: url(../fonts/BuilderSans-Regular.otf) format("opentype"); }
+@font-face { font-family: BuilderSans; font-weight: 500; src: url(../fonts/BuilderSans-Medium.otf) format("opentype"); }
+@font-face { font-family: BuilderSans; font-weight: 700; src: url(../fonts/BuilderSans-Bold.otf) format("opentype"); }
+@font-face { font-family: BuilderSans; font-weight: 800; src: url(../fonts/BuilderSans-ExtraBold.otf) format("opentype"); }
+@font-face { font-family: BuilderIcons; src: url(../fonts/BuilderIcons-Regular.ttf) format("truetype"); }
+@font-face { font-family: BuilderIconsFilled; src: url(../fonts/BuilderIcons-Filled.ttf) format("truetype"); }

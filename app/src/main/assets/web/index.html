@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#121215">
+<title>SalBlox</title>
+<link rel="stylesheet" href="css/fonts.css">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<div id="app">
+  <section class="screen" id="s-home">
+    <!-- HomeView.swift: topBar -> tabs -> ScrollView { forYou | chartsList } -->
+    <div class="htop">
+      <button class="ic hamb" data-a="menu" aria-label="Menu">three-bars-horizontal<span class="hdot"></span></button>
+      <span class="wordmark-slot" aria-hidden="true"></span>
+      <span class="sp"></span>
+      <button class="ic" data-a="none" aria-label="Search" style="font-size:25px;width:26px">magnifying-glass</button>
+      <button class="ic" data-a="robux" aria-label="Robux" style="font-size:26px;width:26px;margin-left:18.5px">robux</button>
+      <button class="ic bell" data-a="none" aria-label="Notifications" style="font-size:24px;width:26px;margin-left:18.5px">bell<span class="cnt" id="bellCnt" hidden></span></button>
+    </div>
+    <div class="htabs">
+      <button id="tabFor" class="on" data-a="htab" data-t="forYou"><span>For you</span><i></i></button>
+      <button id="tabCharts" data-a="htab" data-t="charts"><span>Charts</span><i></i></button>
+    </div>
+    <div class="scroll hpad" id="homeBody"></div>
+    <div class="tabbar">
+      <button data-a="tab" data-t="home"><span class="ic">house</span>Home</button>
+      <button data-a="tab" data-t="moments"><span class="ic">moments</span>Moments</button>
+      <button data-a="tab" data-t="chat"><span class="ic">speech-bubble-align-center</span>Chat</button>
+      <button data-a="tab" data-t="me"><span class="me-av"></span>Me</button>
+    </div>
+  </section>
+
+  <!-- FriendsListView.swift ported (Roblox-only parts show the app's offline state) -->
+  <section class="sheetfull" id="s-friends" hidden>
+    <div class="bar"><button class="ic" data-a="closefriends" aria-label="Back" style="font-size:24px">chevron-large-left</button><span class="title">Friends</span><span style="width:24px"></span></div>
+    <div class="scroll"><div class="fpad">
+      <div class="addrow">
+        <input class="field" id="addName" placeholder="Add a friend by Roblox username" style="font-size:14.5px;min-height:40px;flex:1">
+        <button class="addbtn" data-a="addfriend">Add</button>
+      </div>
+      <div class="fnote" id="addNote"></div>
+      <div class="fhead" id="fCount">Friends (0)</div>
+      <div id="fList"></div>
+      <div class="fmore" id="fMore"></div>
+    </div></div>
+  </section>
+
+  <!-- ChatPage.swift ported -->
+  <section class="sheetfull" id="s-chatpage" hidden>
+    <div class="bar"><button class="ic" data-a="closechat" aria-label="Back" style="font-size:24px">chevron-large-left</button><span class="title" id="cpTitle">Chat</span><span style="width:24px"></span></div>
+    <div class="cbody" id="cpBody"><div id="cpLines" style="padding:16px;display:flex;flex-direction:column;gap:6px"></div></div>
+    <div class="cinput">
+      <button class="cswitch" id="cpSwitch" data-a="cpswitch" aria-label="Send as"></button>
+      <input class="field" id="cpField" placeholder="Say something" style="font-size:14.5px;min-height:40px;border-radius:20px;flex:1">
+      <button class="csend" id="cpSend" data-a="cpsend" aria-label="Send" disabled><span class="ic">paper-airplane</span></button>
+    </div>
+  </section>
+
+  <!-- Friend sheet: the local parts of FriendSheet.swift -->
+  <div class="sheetfull" id="s-friend" hidden style="background:linear-gradient(#29282c 0%,#4d5764 45%,#121215 100%);border-radius:16px 16px 0 0;top:auto;height:82%">
+    <div style="height:22px;display:flex;align-items:center;justify-content:center"><span style="width:39px;height:4px;border-radius:2px;background:#3a3b42;display:block"></span></div>
+    <div class="scroll"><div style="padding:0 24px 30px">
+      <div style="height:236px"></div>
+      <div style="display:flex;align-items:center;gap:12px;margin-top:6px">
+        <span class="fav88" id="fAv"></span>
+        <div style="min-width:0"><div class="fname" id="fDisplay"></div><div class="fuser" id="fUser"></div></div>
+      </div>
+      <div class="fbtns">
+        <button class="gbtn" data-a="fchat">Chat</button>
+        <button class="gbtn" id="fTrustBtn" data-a="ftrust">Add trusted friend</button>
+        <button class="gbtn more" id="fMoreBtn" data-a="fmore" aria-label="More"><span class="ic">three-dots-horizontal</span></button>
+      </div>
+      <div class="fnotice" id="fSheetNote"></div>
+    </div></div>
+  </div>
+
+  <!-- Moments and Me are not converted yet. Shown as-is so the tab bar still works. -->
+  <section class="screen" id="s-moments" hidden>
+    <div class="scroll" style="padding:24px 20px;color:var(--faint);font-size:14.5px">Moments: not converted yet.</div>
+    <div class="tabbar">
+      <button data-a="tab" data-t="home"><span class="ic">house</span>Home</button>
+      <button data-a="tab" data-t="moments" class="on"><span class="ic">moments</span>Moments</button>
+      <button data-a="tab" data-t="chat"><span class="ic">speech-bubble-align-center</span>Chat</button>
+      <button data-a="tab" data-t="me"><span class="me-av"></span>Me</button>
+    </div>
+  </section>
+  <section class="screen" id="s-me" hidden>
+    <div class="scroll" style="padding:24px 20px;color:var(--faint);font-size:14.5px">Me (avatar and customize): not converted yet.</div>
+    <div class="tabbar">
+      <button data-a="tab" data-t="home"><span class="ic">house</span>Home</button>
+      <button data-a="tab" data-t="moments"><span class="ic">moments</span>Moments</button>
+      <button data-a="tab" data-t="chat"><span class="ic">speech-bubble-align-center</span>Chat</button>
+      <button data-a="tab" data-t="me" class="on"><span class="me-av"></span>Me</button>
+    </div>
+  </section>
+
+  <!-- ChatList.swift ported -->
+  <section class="screen" id="s-chat" hidden>
+    <div class="chead">
+      <button class="ic" data-a="menu" aria-label="Menu" style="font-size:25px;position:relative">three-bars-horizontal<span class="hdot"></span></button>
+      <span class="ctitle">Chat</span>
+      <span class="sp"></span>
+      <button class="ic" data-a="chatsearch" aria-label="Search" style="font-size:25px" id="chatSearchBtn">magnifying-glass</button>
+      <button class="ic" data-a="friends" aria-label="New chat" style="font-size:25px;margin-left:22px">pencil-square</button>
+    </div>
+    <div id="chatSearchBox" style="padding:0 20px 10px" hidden>
+      <input class="field" id="chatQuery" placeholder="Search chats" style="font-size:16px;min-height:40px">
+    </div>
+    <div class="scroll" id="chatBody"></div>
+    <div class="tabbar">
+      <button data-a="tab" data-t="home"><span class="ic">house</span>Home</button>
+      <button data-a="tab" data-t="moments"><span class="ic">moments</span>Moments</button>
+      <button data-a="tab" data-t="chat"><span class="ic">speech-bubble-align-center</span>Chat</button>
+      <button data-a="tab" data-t="me"><span class="me-av"></span>Me</button>
+    </div>
+  </section>
+
+  <div class="dim" id="dim" hidden data-a="closemenu"></div>
+  <!-- MenuView.swift ported: width 80%, padding 18 horizontal, background (15,17,20) -->
+  <aside class="menu" id="menu">
+    <button class="mprofile" data-a="toast" data-m="Profile page is not converted yet">
+      <span class="avatar64"></span>
+      <span><span class="mname" id="mName"></span><span class="muser" id="mUser"></span></span>
+    </button>
+    <div class="rcard">
+      <div class="r1">
+        <span class="ic" style="font-size:24px">robux</span>
+        <span class="amt" id="mRobux"></span>
+        <button class="sm" data-a="robux">Buy Robux</button>
+      </div>
+      <button class="r2" data-a="toast" data-m="Roblox Plus page is not converted yet">
+        <span class="ic" style="font-size:22px">roblox-plus</span>
+        <span class="r2t"><span>More fun for less Robux.</span><span>Subscribe to Roblox Plus.</span></span>
+        <span class="ic" style="font-size:20px">chevron-large-right</span>
+      </button>
+    </div>
+    <div class="mrows">
+      <button class="mrow" data-a="toast" data-m="Favorites is not converted yet"><span class="ic">bookmark</span>Favorites</button>
+      <button class="mrow" data-a="toast" data-m="Continue Playing is not converted yet"><span class="ic">clock-spin-reverse</span>Continue Playing</button>
+      <button class="mrow" data-a="friends"><span class="ic">two-people</span>Friends<span class="cbub" id="mbFriends" hidden></span></button>
+      <button class="mrow" data-a="toast" data-m="Communities is not converted yet"><span class="ic">three-people</span>Communities</button>
+      <button class="mrow" data-a="toast" data-m="Inventory is not converted yet"><span class="ic">backpack</span>Inventory</button>
+      <button class="mrow" data-a="toast" data-m="Trades is not converted yet"><span class="ic">hand-two-arrows-horizontal</span>Trades</button>
+      <button class="mrow" data-a="toast" data-m="Messages is not converted yet"><span class="ic">envelope</span>Messages<span class="cbub" id="mbMessages" hidden></span></button>
+      <button class="mrow" data-a="toast" data-m="Roblox Plus is not converted yet"><span class="ic">roblox-plus</span>Roblox Plus</button>
+      <button class="mrow" data-a="edit"><span class="ic">gear</span>Settings</button>
+      <button class="mrow" data-a="toast" data-m="Help &amp; Safety is not converted yet"><span class="ic">shield-lock</span>Help &amp; Safety</button>
+      <div class="mdiv"></div>
+      <button class="mrow" data-a="moments"><span class="ic">moments</span>Moments</button>
+      <button class="mrow" data-a="toast" data-m="Learn is not converted yet"><span class="ic">person-graduate</span>Learn</button>
+      <button class="mrow" data-a="toast" data-m="Create is not converted yet"><span class="ic">studio</span>Create</button>
+    </div>
+    <button class="switch" data-a="toast" data-m="Switch Accounts is not converted yet">Switch Accounts</button>
+  </aside>
+
+  <section class="sheetfull" id="s-edit" hidden>
+    <div class="bar"><span class="title">Edit — Profile</span><button data-a="closeedit" aria-label="Close" style="width:24px;height:24px;display:flex;align-items:center;justify-content:center"><svg class="close-x" viewBox="0 0 19 19" aria-hidden="true"><path d="M3 3 L16 16 M16 3 L3 16" stroke="#f7f7f8" stroke-width="2.6" stroke-linecap="round"/></svg></button></div>
+    <div class="scroll">
+      <div class="form">
+        <div class="head">Account</div>
+        <div class="row">
+          <div><div class="label">Username</div><input class="field" id="f-user" autocomplete="off" autocapitalize="off"></div>
+          <div><div class="label">Display name</div><input class="field" id="f-name" autocomplete="off"></div>
+        </div>
+        <div><div class="label">Robux</div><input class="field" id="f-robux" inputmode="numeric"></div>
+
+        <div class="head" style="margin-top:12px">Friends, followers &amp; following</div>
+        <div class="row">
+          <div><div class="label">Friends</div><input class="field" id="f-friends" inputmode="numeric"></div>
+          <div><div class="label">Followers</div><input class="field" id="f-followers" inputmode="numeric"></div>
+          <div><div class="label">Following</div><input class="field" id="f-following" inputmode="numeric"></div>
+        </div>
+
+        <div class="head" style="margin-top:12px">Bio</div>
+        <div><div class="label">About (up to 1,000 characters)</div><textarea class="field" id="f-bio"></textarea></div>
+        <div class="hint">Shown in the About section of your profile.</div>
+
+        <div class="head" style="margin-top:12px">Badges</div>
+        <button class="vrow" id="f-ver" data-a="verify" aria-pressed="false"><span class="vbox" id="verBox"></span><span>Verified (shown first, right after your name)</span></button>
+        <div class="bseg" id="badgeSeg"><button data-a="badge" data-b="none">No badge</button><button data-a="badge" data-b="plus">Plus</button><button data-a="badge" data-b="pro">Pro</button></div>
+
+        <div class="head" style="margin-top:12px">Profile picture</div>
+        <div class="hint">Drag and zoom the avatar to choose what the round picture shows everywhere.</div>
+        <div><button class="gray" data-a="toast" data-m="Crop needs the image pipeline (not ported yet)">Adjust profile picture</button></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- RobuxPage.swift ported -->
+  <section class="sheetfull" id="s-robux" hidden style="background:#000">
+    <div class="rbar">
+      <button class="rclose" data-a="closerobux" aria-label="Close"><span class="ic">x</span></button>
+      <span class="ic" style="font-size:20px;margin-left:18px">robux</span>
+      <span class="rbal" id="rBal" style="margin-left:6px">0</span>
+      <span style="flex:1"></span>
+      <button class="rsend" data-a="sendrobux" aria-label="Send"><span class="ic" style="font-size:15px">arrow-up-from-line</span>Send</button>
+    </div>
+    <div class="scroll rbody">
+      <div class="rtitle">Buy Robux</div>
+      <div class="rsec">Robux packages</div>
+      <div class="rterms">By purchasing Robux, you agree to our <b>Terms of Use</b>, including the arbitration clause and revocation policy.</div>
+      <div class="rpanel" id="rPacks"></div>
+      <button class="rtx" data-a="none"><span>My Transactions</span><span style="flex:1"></span><span class="ic" style="font-size:18px">chevron-large-right</span></button>
+      <div class="rnew"><span class="ic" style="font-size:20px">premium</span><span class="rsec" style="margin:0">New on Roblox</span><span style="flex:1"></span><a class="rlearn" href="https://www.roblox.com/premium/membership" target="_blank" rel="noopener">Learn more</a></div>
+      <div class="plans" id="rPlans"></div>
+      <div class="dots" id="rDots"></div>
+      <div class="faqh">FAQ</div>
+      <div id="rFaq"></div>
+    </div>
+  </section>
+
+  <!-- alert used by Buy Robux and Subscribe -->
+  <div class="dlg" id="dlg" hidden>
+    <div class="dlgbox">
+      <div class="dlgt" id="dlgTitle"></div>
+      <div class="dlgm" id="dlgMsg"></div>
+      <div class="dlgb"><button id="dlgCancel" data-a="dlgcancel">Cancel</button><button id="dlgOk" class="ok" data-a="dlgok">Buy</button></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+
+<script src="js/core/catalog.js"></script>
+<script src="js/core/games.js"></script>
+<script src="js/core/format.js"></script>
+<script src="js/core/robux.js"></script>
+<script src="js/core/parse.js"></script>
+<script src="js/core/profile.js"></script>
+<script src="js/core/store.js"></script>
+<script src="js/screens/home.js"></script>
+<script src="js/screens/chat.js"></script>
+<script src="js/screens/chat-page.js"></script>
+<script src="js/screens/robux-page.js"></script>
+<script src="js/screens/friends.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
