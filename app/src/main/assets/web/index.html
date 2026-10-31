@@ -394,6 +394,12 @@ textarea.field { padding:8px; min-height:106px; resize:none; line-height:1.3; }
 .htop { display:flex; align-items:center; height:28px; padding:6px 22px 29px 20px; box-sizing:content-box; }
 .htop .hamb { font-size:25px; position:relative; width:auto; }
 .htop .hdot { position:absolute; right:-1px; top:-1px; width:8px; height:8px; border-radius:50%; background:#335fff; }
+.me-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; padding:12px 16px; }
+.me-item { background:none; border:0; text-align:left; color:inherit; padding:0; }
+.me-ithumb { aspect-ratio:1; background:var(--tile); border-radius:8px; overflow:hidden; }
+.me-ithumb img { width:100%; height:100%; object-fit:cover; }
+.me-iname { font-weight:700; font-size:14px; margin-top:6px; }
+.me-iprice { font-size:13px; color:var(--faint); display:flex; align-items:center; gap:4px; }
 .htop .wordmark-slot { width:0; margin-left:11px; }
 .htop .sp { flex:1; }
 .bell { position:relative; }
@@ -3233,6 +3239,7 @@ const Me = (() => {
   let searching = false;    // the full-screen search page (SearchPage-style field + Recent Searches)
   let typed = "";           // text in the search field
   let query = "";           // the last search that was run
+  let marketItems = null;   // results for `query`: null while loading, [] when nothing came back
   let raised = false;       // the sheet is pulled up (Raise/Lower the list)
   let sort = "Relevance";   // Sort menu: Relevance, Price: low to high, Price: high to low
   let sortOpen = false;
@@ -3298,7 +3305,15 @@ const Me = (() => {
   function marketplace() {
     const front = category === "All" && !sub;
     const heading = front ? "Recommended For You" : (sub || category);
-    if (query) return `<div class="me-showing" style="display:flex;align-items:center;gap:8px">Showing results for <b>${esc(query)}</b><button class="me-clear" data-m-act="clearsearch">Clear search</button></div><div class="me-msg">Roblox sent nothing to show.</div>`;
+    if (query) {
+      const shownList = marketItems || [];
+      const cards = shownList.map(it => `<button class="me-item" data-m-act="openitem" data-v="${it.id}">
+        <div class="me-ithumb">${it.thumb ? `<img src="${escapeHtml(it.thumb)}" alt="">` : ""}</div>
+        <div class="me-iname">${escapeHtml(it.name)}</div>
+        <div class="me-iprice">${it.price > 0 ? '<span class="ic">robux</span>' : ""}${escapeHtml(Format.priceText(it.price))}</div></button>`).join("");
+      const body = marketItems === null ? `<div class="me-msg">Loading…</div>` : (shownList.length ? `<div class="me-grid">${cards}</div>` : `<div class="me-msg">Roblox sent nothing to show.</div>`);
+      return `<div class="me-showing" style="display:flex;align-items:center;gap:8px">Showing results for <b>${esc(query)}</b><button class="me-clear" data-m-act="clearsearch">Clear search</button></div>${body}`;
+    }
     return `${category === "Backgrounds" ? `<div style="padding-top:10px">${promoBanner()}</div>` : ""}
       <div class="me-h">${esc(heading)}</div>
       <div class="me-msg">Roblox sent nothing to show.</div>`;
@@ -3451,7 +3466,13 @@ const Me = (() => {
     const list = readRecents().filter(x => x.toLowerCase() !== q.toLowerCase());
     writeRecents([q, ...list].slice(0, 12));
     query = q; typed = ""; searching = false;
+    marketItems = null;
     render();
+    const run = q;
+    if (typeof marketSource === "function") {
+      marketSource(q).then(list => { if (query === run) { marketItems = list; render(); } })
+        .catch(() => { if (query === run) { marketItems = []; render(); } });
+    } else { marketItems = []; render(); }
   }
 
   function onClick(e) {
@@ -3461,21 +3482,22 @@ const Me = (() => {
     if (a === "search") { searching = true; typed = ""; render(); return; }
     if (a === "cancelsearch") { searching = false; typed = ""; render(); return; }
     if (a === "runsearch") { runSearch(v); return; }
-    if (a === "clearsearch") { query = ""; render(); return; }
+    if (a === "clearsearch") { query = ""; marketItems = null; render(); return; }
+    if (a === "openitem") { const it = (marketItems || []).find(x => String(x.id) === v); if (it) ItemPage.open(it); return; }
     if (a === "outfitadd") { outfitDialog = { kind: "name" }; render(); return; }
     if (a === "owned") {
       const item = st.profile.items.find(i => String(i.id) === v && (!!i.bundle) === (el.dataset.b === "1"));
       if (!item) return;
       const o = Profile.owns(st.profile, item);
       Store.wear(st, item, !(o && o.wearing));
-      save(); render(); return;
+      save(); render(); previewWorn(st); return;
     }
     if (a === "outfit") {
       const o = st.profile.outfits.find(x => String(x.id) === v);
       if (!o) return;
       if (Store.isWorn(st, o)) outfitDialog = { kind: "details", outfit: o };
       else if (Store.wearOutfit(st, o)) save();
-      render(); return;
+      render(); previewWorn(st); return;
     }
     if (a === "dialogclose") { if (e.target !== el) return; outfitDialog = null; render(); return; }
     if (a === "outfitsave") {
@@ -4384,6 +4406,34 @@ function paintPhotos() {
     a.style.backgroundRepeat = "no-repeat";
   });
 }
+// Try-on: the server draws the avatar with the worn items (POST /look with wear). Nothing is written to Roblox.
+let lookBase = null;   // the user's own avatar definition, from the last /look
+let previewSeq = 0;
+async function previewWorn(st) {
+  if (!SERVER_URL || !lookBase) return;
+  const wear = st.profile.items
+    .filter(i => { const o = Profile.owns(st.profile, i); return !!(o && o.wearing); })
+    .map(i => ({ id: i.id, bundle: !!i.bundle }));
+  const seq = ++previewSeq;
+  try {
+    const r = await fetch(SERVER_URL + "/look", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ base: lookBase, wear })
+    });
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok || seq !== previewSeq || !body.model || !body.model.obj) return;
+    if (body.image) probePic(body.image);
+    const obj = await (await fetch(body.model.obj)).text();
+    const mtl = body.model.mtl ? await (await fetch(body.model.mtl)).text() : "";
+    const files = {};
+    for (const u of body.model.textures || []) files[u.split("/").pop()] = u;
+    if (seq !== previewSeq) return;
+    await AvatarStage.setModel({ obj, mtl, textures: files, bodyColors: (body.definition || {}).bodyColors });
+  } catch (e) {
+    console.log("[avatar] preview failed:", e && e.message);
+  }
+}
+
 async function loadMyAvatar() {
   if (!SERVER_URL) return;
   const seq = ++lookSeq;
@@ -4409,6 +4459,7 @@ async function loadMyAvatar() {
       body: JSON.stringify({ user })
     });
     const body = await r.json().catch(() => ({}));
+    if (r.ok && body.definition) lookBase = body.definition;
     if (r.ok && body.image && body.image !== lookPic) probePic(body.image);
     try {
       if (r.ok && body.image) localStorage.setItem("salblox-look-" + user, JSON.stringify({ image: body.image, background: (body.background && body.background.thumb) || null }));
@@ -4504,6 +4555,24 @@ gameSource = async (id) => {
     more: { passes, passIcons, also, social: extra ? extra.social : [], voice: extra ? extra.voice : undefined, camera: extra ? extra.camera : undefined },
   };
 };
+// Marketplace search for the Me tab and the trade page: same call as Roblox.search in App/Data/Roblox.swift.
+async function catalogSearchSource(keyword) {
+  const text = await httpGet(robloxUrl("https://catalog.roblox.com/v2/search/items/details", { keyword, limit: "30", sortType: "1" }));
+  const items = Parse.catalog(text).filter(i => !i.bundle);
+  if (!items.length) return [];
+  const ids = items.map(i => i.id).join(",");
+  let pics = {};
+  for (let round = 0; round < 2; round++) {
+    const t = await httpGet(robloxUrl("https://thumbnails.roblox.com/v1/assets", { assetIds: ids, size: "420x420", format: "Png" })).catch(() => null);
+    if (!t) break;
+    Object.assign(pics, Parse.images(t));
+    if (!t.includes('"Pending"') || round === 1) break;
+    await new Promise(r => setTimeout(r, 1500));
+  }
+  return items.map(i => ({ ...i, thumb: pics[i.id] || null }));
+}
+let marketSource = null;
+marketSource = catalogSearchSource;
 async function homeSourceNative() {
   const sid = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random());
   const sorts = Parse.sorts(await httpGet("https://apis.roblox.com/explore-api/v1/get-sorts?sessionId=" + encodeURIComponent(sid)));
