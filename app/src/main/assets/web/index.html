@@ -768,7 +768,7 @@ textarea.field { padding:8px; min-height:106px; resize:none; line-height:1.3; }
   <section class="sheetfull" id="s-search" hidden>
     <div class="bar"><button class="ic" data-a="closesearch" aria-label="Back" style="font-size:24px">chevron-large-left</button><span class="title">Search</span><span style="width:24px"></span></div>
     <div class="sbox">
-      <div class="sfield"><span class="ic" style="font-size:18px;color:var(--faint)">magnifying-glass</span><input id="sField" placeholder="Search" autocomplete="off" style="flex:1;background:none;border:0;outline:0;font-size:16px;color:var(--ink);min-width:0"></div>
+      <div class="sfield"><span class="ic" style="font-size:18px;color:var(--faint)">magnifying-glass</span><input id="sField" placeholder="Search" enterkeyhint="search" autocomplete="off" style="flex:1;background:none;border:0;outline:0;font-size:16px;color:var(--ink);min-width:0"></div>
     </div>
     <div class="scroll spad">
       <div class="snote" id="sNote"></div>
@@ -2524,7 +2524,7 @@ const SearchPage = (() => {
 
   function bind() {
     $("sField").addEventListener("input", e => { query = e.target.value; });
-    $("sField").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); search(); } });
+    $("sField").addEventListener("keydown", e => { if (e.key === "Enter" || e.keyCode === 13) { e.preventDefault(); search(); } });
   }
 
   return { open, close, bind, render };
