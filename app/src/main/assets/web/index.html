@@ -3306,7 +3306,22 @@ const Me = (() => {
     return `<div class="me-banner"><span class="ic">roblox-plus</span><span class="t">Unlock free exclusive backgrounds with Plus.</span><button data-a="robux">Subscribe</button></div>`;
   }
 
+  let frontLoading = false;
+  function ensureFront() {
+    if (query || marketItems !== null || frontLoading || typeof marketSource !== "function") return;
+    frontLoading = true;
+    (async () => {
+      for (const pause of [0, 2000, 5000]) {
+        if (pause) await new Promise(r => setTimeout(r, pause));
+        try { marketItems = await marketSource(""); break; } catch (e) { marketItems = null; }
+      }
+      if (marketItems === null) marketItems = [];
+      frontLoading = false;
+      render();
+    })();
+  }
   function marketplace() {
+    if (!query) ensureFront();
     const front = category === "All" && !sub;
     const heading = front ? "Recommended For You" : (sub || category);
     if (query) {
@@ -3318,9 +3333,17 @@ const Me = (() => {
       const body = marketItems === null ? `<div class="me-msg">Loading…</div>` : (shownList.length ? `<div class="me-grid">${cards}</div>` : `<div class="me-msg">Roblox sent nothing to show.</div>`);
       return `<div class="me-showing" style="display:flex;align-items:center;gap:8px">Showing results for <b>${esc(query)}</b><button class="me-clear" data-m-act="clearsearch">Clear search</button></div>${body}`;
     }
+    const frontList = marketItems || [];
+    const frontCards = frontList.map(it => `<button class="me-item" data-m-act="openitem" data-v="${it.id}">
+        <div class="me-ithumb">${it.thumb ? `<img src="${escapeHtml(it.thumb)}" alt="">` : ""}</div>
+        <div class="me-iname">${escapeHtml(it.name)}</div>
+        <div class="me-iprice">${it.price > 0 ? '<span class="ic">robux</span>' : ""}${escapeHtml(Format.priceText(it.price))}</div></button>`).join("");
+    const frontBody = front && marketItems === null ? `<div class="me-msg">Loading…</div>`
+      : front && frontList.length ? `<div class="me-grid">${frontCards}</div>`
+      : `<div class="me-msg">Roblox sent nothing to show.</div>`;
     return `${category === "Backgrounds" ? `<div style="padding-top:10px">${promoBanner()}</div>` : ""}
       <div class="me-h">${esc(heading)}</div>
-      <div class="me-msg">Roblox sent nothing to show.</div>`;
+      ${frontBody}`;
   }
 
   function shelfTabs() {
@@ -4565,7 +4588,9 @@ gameSource = async (id) => {
 };
 // Marketplace search for the Me tab and the trade page: same call as Roblox.search in App/Data/Roblox.swift.
 async function catalogSearchSource(keyword) {
-  const text = await httpGet(robloxUrl("https://catalog.roblox.com/v2/search/items/details", { keyword, limit: "30", sortType: "1" }));
+  const params = { limit: "30" };
+  if (keyword) { params.keyword = keyword; params.sortType = "1"; }
+  const text = await httpGet(robloxUrl("https://catalog.roblox.com/v2/search/items/details", params));
   const items = Parse.catalog(text).filter(i => !i.bundle);
   if (!items.length) return [];
   const ids = items.map(i => i.id).join(",");
