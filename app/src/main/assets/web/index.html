@@ -591,6 +591,11 @@ textarea.field { padding:8px; min-height:106px; resize:none; line-height:1.3; }
 .gcreator { font-size:16px; }
 .gmat { font-size:14.5px; color:var(--faint); }
 .vb { color:var(--verified); font-size:14px; }
+/* VerifiedBadge (Badges.swift): backplate in verified blue, white check on top */
+.vbadge { position:relative; display:inline-block; width:18px; height:18px; vertical-align:-3px; margin-left:2px; }
+.vbadge .ic { position:absolute; left:0; top:0; font-size:18px; line-height:18px; }
+.vbadge .vb-back { color:#335fff; }
+.vbadge .vb-check { color:#fff; }
 .gpics { position:relative; aspect-ratio:16/9; border-radius:8px; background:var(--tile); overflow:hidden; margin-top:28px; }
 .gpics img { width:100%; height:100%; object-fit:cover; }
 .gdots { position:absolute; bottom:14px; left:0; right:0; display:flex; justify-content:center; gap:7px; }
@@ -2280,7 +2285,7 @@ const GamePage = (() => {
       <div class="gicon">${shown.icon ? `<img src="${shown.icon}" alt="">` : ""}</div>
       <div class="gtext">
         <div class="gname">${escapeHtml(game.name)}</div>
-        ${info && info.creator ? `<div class="gcreator">${escapeHtml(info.creator)}${info.creatorVerified ? ' <span class="vb">&#10004;</span>' : ""}</div>` : ""}
+        ${info && info.creator ? `<div class="gcreator">${escapeHtml(info.creator)}${info.creatorVerified ? ' <span class="vbadge"><span class="ic filled vb-back">verified-backplate</span><span class="ic filled vb-check">verified-check</span></span>' : ""}</div>` : ""}
         ${maturity ? `<div class="gmat">${escapeHtml(maturity)}</div>` : ""}
       </div>
     </div>`;
