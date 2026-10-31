@@ -4661,8 +4661,12 @@ async function robloxComplete(games) {
 async function robloxSearchGames(query) {
   try {
     const sid = crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random();
-    const data = await httpGet(robloxUrl("https://apis.roblox.com/search-api/omni-search",
-      { searchQuery: query, sessionId: sid, pageType: "all" }));
+    const searchUrl = robloxUrl("https://apis.roblox.com/search-api/omni-search",
+      { searchQuery: query, sessionId: sid, pageType: "all" });
+    // Roblox sometimes says "busy" for a moment: ask once more before giving up (Swift's try? does not retry, so this only helps)
+    let data;
+    try { data = await httpGet(searchUrl); }
+    catch (e) { await new Promise(r => setTimeout(r, 1500)); data = await httpGet(searchUrl); }
     return await robloxComplete(Parse.games(data).slice(0, 20));
   } catch (e) { return robloxRequestFailed(e); }
 }
