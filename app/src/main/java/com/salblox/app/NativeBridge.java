@@ -74,10 +74,6 @@ public class NativeBridge {
         c.setReadTimeout(20000);
         c.setRequestProperty("User-Agent", USER_AGENT);
         c.setRequestProperty("Accept", "application/json");
-        String cookie = Session.cookie(ctx);
-        if (cookie != null) {
-            c.setRequestProperty("Cookie", ".ROBLOSECURITY=" + cookie);
-        }
         if (token != null) {
             c.setRequestProperty("x-csrf-token", token);
         }

@@ -30,9 +30,7 @@ public class MainActivity extends Activity {
         setContentView(web);
         web.loadUrl("file:///android_asset/web/index.html");
 
-        if (!Session.isLoggedIn(this) && !Session.skipped(this)) {
-            startActivityForResult(new Intent(this, LoginActivity.class), REQ_LOGIN);
-        }
+        // No login: the Roblox data used by the app is public, so the app opens straight to the web app.
     }
 
     @Override
