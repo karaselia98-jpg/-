@@ -2527,7 +2527,7 @@ const SearchPage = (() => {
     $("sField").addEventListener("keydown", e => { if (e.key === "Enter" || e.keyCode === 13) { e.preventDefault(); search(); } });
   }
 
-  return { open, close, bind, render };
+  return { open, close, bind, render, findGame: id => results.find(g => String(g.id) === String(id)) || null };
 })();
 
 // The screens. Data comes from the ported core (Store, Profile, Robux, Format).
@@ -4245,7 +4245,7 @@ document.addEventListener("click", e => {
   else if (a === "htab") Home.setTab(el.dataset.t);
   else if (a === "search") SearchPage.open();
   else if (a === "closesearch") SearchPage.close();
-  else if (a === "opengame") { const g = Home.findGame(el.dataset.id); if (g) GamePage.open(g); }
+  else if (a === "opengame") { const g = Home.findGame(el.dataset.id) || SearchPage.findGame(el.dataset.id); if (g) GamePage.open(g); }
   else if (a === "chatsearch") ChatList.toggleSearch();
   else if (a === "closefriends") Friends.close();
   else if (a === "openchat") ChatPage.open(Number(el.dataset.id));
