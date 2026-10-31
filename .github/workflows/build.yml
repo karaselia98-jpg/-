@@ -16,12 +16,14 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - uses: android-actions/setup-android@v3
-
+      # ubuntu-latest already has the Android SDK (ANDROID_HOME). The setup-android action
+      # failed on an old "tools" package, so it is not used here.
       - name: Install Android platform and build tools
         run: |
-          yes | sdkmanager --licenses > /dev/null || true
-          sdkmanager "platforms;android-34" "build-tools;34.0.0"
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKMANAGER" ]; then SDKMANAGER="$(ls -d $ANDROID_HOME/cmdline-tools/*/bin/sdkmanager | head -1)"; fi
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          "$SDKMANAGER" "platforms;android-34" "build-tools;34.0.0"
 
       - uses: gradle/actions/setup-gradle@v4
         with:
