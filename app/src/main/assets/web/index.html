@@ -4505,7 +4505,11 @@ async function homeSource() {
 async function httpGet(url) {
   if (window.SalBloxNative) {
     const body = window.SalBloxNative.get(url);
-    if (body === null || body === undefined || body === "") throw new Error("Roblox didn't answer.");
+    if (body === null || body === undefined || body === "") {
+      let why = "";
+      try { why = window.SalBloxNative.lastError ? window.SalBloxNative.lastError() : ""; } catch (e) {}
+      throw new Error("Roblox didn't answer." + (why ? " (" + why + ")" : ""));
+    }
     return body;
   }
   const r = await fetch(url);

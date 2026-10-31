@@ -18,6 +18,8 @@ import java.nio.charset.StandardCharsets;
  */
 public class NativeBridge {
     private static final String USER_AGENT = "SalBlox/1.0 (Android)";
+    // why the last request failed (HTTP code or exception), so the page can show it
+    private static volatile String lastError = "";
 
     private final Context ctx;
 
@@ -28,6 +30,12 @@ public class NativeBridge {
     @JavascriptInterface
     public boolean isLoggedIn() {
         return Session.isLoggedIn(ctx);
+    }
+
+    /** The reason the last request failed, e.g. "GET 429". Empty when the last request worked. */
+    @JavascriptInterface
+    public String lastError() {
+        return lastError;
     }
 
     /** GET a Roblox URL. Returns the response body, or null on any failure. */
@@ -55,7 +63,11 @@ public class NativeBridge {
                         token = csrf;
                         continue;
                     }
-                    if (code < 200 || code >= 300) return null;
+                    if (code < 200 || code >= 300) {
+                        lastError = method + " " + code;
+                        return null;
+                    }
+                    lastError = "";
                     return read(c.getInputStream());
                 } finally {
                     c.disconnect();
@@ -63,6 +75,7 @@ public class NativeBridge {
             }
             return null;
         } catch (Exception e) {
+            lastError = e.getClass().getSimpleName();
             return null;
         }
     }
