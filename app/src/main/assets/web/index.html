@@ -5244,6 +5244,11 @@ async function copyAvatarFrom(name) {
   Profile.adopt(st.profile, items);
   st.profile.definition = look.definition;
   lookBase = look.definition;
+  // the username typed here becomes this profile's own name, and its avatar is the one shown
+  st.profile.username = user.name;
+  st.profile.displayName = user.displayName || user.name;
+  st.profile.verified = !!user.verified;
+  loadedFor = null;
   await applyLookBody(look);
   save();
   return items.length;
