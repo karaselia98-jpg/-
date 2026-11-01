@@ -5664,6 +5664,144 @@ const AvatarCore = (() => {
 if (typeof module !== "undefined") module.exports = AvatarCore;
 
 // ---- Avatar stage on the page (port of AvatarStage / Avatar3DView in Avatar3D.swift) ----
+// WebGL drawing of the avatar: the same camera, lights and textures as AvatarCore.render (which stays as the fallback).
+// The GPU does the turning, so a drag or a momentum spin runs at screen speed, like SceneKit in Swift.
+const AvatarGL = (() => {
+  const LEAN = 2 * Math.PI / 180;
+  const LIGHT = (() => { const a = -0.5, b = Math.PI + 0.5; const d = [0, Math.sin(a), -Math.cos(a)]; const dir = [d[2] * Math.sin(b), d[1], d[2] * Math.cos(b)]; return [-dir[0], -dir[1], -dir[2]]; })();
+  const VS = "attribute vec3 aPos; attribute vec3 aNor; attribute vec2 aUv; uniform mat4 uMVP; uniform mat3 uNor; varying vec3 vN; varying vec2 vUv;" +
+    "void main(){ gl_Position = uMVP * vec4(aPos, 1.0); vN = uNor * aNor; vUv = aUv; }";
+  const FS = "precision mediump float; varying vec3 vN; varying vec2 vUv; uniform vec3 uL; uniform vec3 uCol; uniform sampler2D uTex; uniform float uHasTex;" +
+    "void main(){ vec3 n = normalize(vN); float light = 0.7 + 0.35 * abs(dot(n, uL)); vec3 c = uCol; if (uHasTex > 0.5) c = texture2D(uTex, vUv).rgb; gl_FragColor = vec4(c * light, 1.0); }";
+  let cvs = null, gl = null, L = null, ext = null, ready = null;
+  const modelCache = new WeakMap(), texCache = new WeakMap();
+
+  function init() {
+    if (ready !== null) return ready;
+    ready = false;
+    try {
+      cvs = document.createElement("canvas");
+      gl = cvs.getContext("webgl", { alpha: true, premultipliedAlpha: false, antialias: true, depth: true }) || cvs.getContext("experimental-webgl");
+      if (!gl) return false;
+      const sh = (type, src) => { const x = gl.createShader(type); gl.shaderSource(x, src); gl.compileShader(x); if (!gl.getShaderParameter(x, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(x)); return x; };
+      const prog = gl.createProgram();
+      gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS));
+      gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS));
+      gl.linkProgram(prog);
+      if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error("link");
+      gl.useProgram(prog);
+      ext = gl.getExtension("OES_element_index_uint");
+      L = {
+        aPos: gl.getAttribLocation(prog, "aPos"), aNor: gl.getAttribLocation(prog, "aNor"), aUv: gl.getAttribLocation(prog, "aUv"),
+        uMVP: gl.getUniformLocation(prog, "uMVP"), uNor: gl.getUniformLocation(prog, "uNor"), uL: gl.getUniformLocation(prog, "uL"),
+        uCol: gl.getUniformLocation(prog, "uCol"), uTex: gl.getUniformLocation(prog, "uTex"), uHasTex: gl.getUniformLocation(prog, "uHasTex"),
+      };
+      gl.uniform1i(L.uTex, 0);
+      gl.uniform3fv(L.uL, LIGHT);
+      gl.enable(gl.DEPTH_TEST);
+      ready = true;
+    } catch (e) { ready = false; }
+    return ready;
+  }
+
+  function bounds(m) {
+    const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+    const p = m.positions;
+    for (let i = 0; i < p.length; i += 3) for (let a = 0; a < 3; a++) { lo[a] = Math.min(lo[a], p[i + a]); hi[a] = Math.max(hi[a], p[i + a]); }
+    return { lo, hi };
+  }
+  const buffer = (target, data) => { const b = gl.createBuffer(); gl.bindBuffer(target, b); gl.bufferData(target, data, gl.STATIC_DRAW); return b; };
+
+  // uploads a model once; null when the GPU cannot take it (the software renderer draws it then)
+  function gpuModel(m) {
+    if (modelCache.has(m)) return modelCache.get(m);
+    let out = null;
+    if (m && m.corners > 0 && m.parts.length > 0 && (ext || m.corners <= 65535)) {
+      const { lo, hi } = bounds(m);
+      const height = hi[1] - lo[1];
+      if (height > 0) {
+        out = {
+          pos: buffer(gl.ARRAY_BUFFER, new Float32Array(m.positions)),
+          nor: buffer(gl.ARRAY_BUFFER, new Float32Array(m.normals)),
+          uv: buffer(gl.ARRAY_BUFFER, new Float32Array(m.uvs)),
+          center: [0, 1, 2].map(a => (lo[a] + hi[a]) / 2),
+          height, width: Math.max(hi[0] - lo[0], hi[2] - lo[2]),
+          parts: m.parts.map(p => {
+            const mat = m.materials ? m.materials[p.material] : null;
+            return { ibo: buffer(gl.ELEMENT_ARRAY_BUFFER, new Uint32Array(p.indices)), n: p.indices.length,
+              col: mat && mat.colour ? mat.colour : [1, 1, 1], tex: mat && mat.texture ? mat.texture : null };
+          }),
+        };
+      }
+    }
+    modelCache.set(m, out);
+    return out;
+  }
+
+  function gpuTexture(tx, name) {
+    if (!tx || !tx[name]) return null;
+    let mp = texCache.get(tx);
+    if (!mp) { mp = new Map(); texCache.set(tx, mp); }
+    if (mp.has(name)) return mp.get(name);
+    const t = tx[name];
+    const tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, t.w, t.h, 0, gl.RGBA, gl.UNSIGNED_BYTE, t.data);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    mp.set(name, tex);
+    return tex;
+  }
+
+  const m3 = (A, B) => { const C = [[0, 0, 0], [0, 0, 0], [0, 0, 0]]; for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) for (let k = 0; k < 3; k++) C[i][j] += A[i][k] * B[k][j]; return C; };
+  const dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const colMajor = (rows) => { const n = rows.length, out = new Float32Array(n * n); for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) out[c * n + r] = rows[r][c]; return out; };
+
+  // draws the model at this turn into the offscreen canvas; false when WebGL is not available
+  function draw(m, tx, angle, W, H) {
+    if (!init()) return false;
+    const g = gpuModel(m);
+    if (!g) return false;
+    if (cvs.width !== W || cvs.height !== H) { cvs.width = W; cvs.height = H; }
+    gl.viewport(0, 0, W, H);
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    const dist = (Math.max(g.height, g.width) / 2 / Math.tan((15 * Math.PI) / 180)) * 1.1;
+    const c = g.center;
+    const cs = Math.cos(angle), sn = Math.sin(angle);
+    const lp = Math.cos(-LEAN), sp = Math.sin(-LEAN);
+    const R = m3([[cs, 0, sn], [0, 1, 0], [-sn, 0, cs]], [[1, 0, 0], [0, lp, -sp], [0, sp, lp]]);
+    const f = 1 / Math.tan((30 * Math.PI) / 360);
+    const s = f * H / W;
+    const near = dist * 0.1, far = dist * 3;
+    const A = (far + near) / (far - near), B = -2 * far * near / (far - near);
+    const rc = i => R[i][0] * c[0] + R[i][1] * c[1] + R[i][2] * c[2];
+    const rows = [
+      [-s * R[0][0], -s * R[0][1], -s * R[0][2], s * rc(0)],
+      [f * R[1][0], f * R[1][1], f * R[1][2], -f * rc(1)],
+      [A * R[2][0], A * R[2][1], A * R[2][2], A * (-rc(2) + dist) + B],
+      [R[2][0], R[2][1], R[2][2], -rc(2) + dist],
+    ];
+    gl.uniformMatrix4fv(L.uMVP, false, colMajor(rows));
+    gl.uniformMatrix3fv(L.uNor, false, colMajor(R));
+    gl.bindBuffer(gl.ARRAY_BUFFER, g.pos); gl.enableVertexAttribArray(L.aPos); gl.vertexAttribPointer(L.aPos, 3, gl.FLOAT, false, 0, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, g.nor); gl.enableVertexAttribArray(L.aNor); gl.vertexAttribPointer(L.aNor, 3, gl.FLOAT, false, 0, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, g.uv); gl.enableVertexAttribArray(L.aUv); gl.vertexAttribPointer(L.aUv, 2, gl.FLOAT, false, 0, 0);
+    for (const p of g.parts) {
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, p.ibo);
+      const tex = p.tex ? gpuTexture(tx, p.tex) : null;
+      if (tex) { gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tex); gl.uniform1f(L.uHasTex, 1); }
+      else { gl.uniform1f(L.uHasTex, 0); gl.uniform3fv(L.uCol, p.col); }
+      gl.drawElements(gl.TRIANGLES, p.n, gl.UNSIGNED_INT, 0);
+    }
+    return true;
+  }
+  return { draw, canvas: () => cvs };
+})();
+
 const AvatarStage = (() => {
   let model = null;          // parsed mesh with materials
   let textures = {};         // name -> {w, h, data}
@@ -5756,6 +5894,7 @@ const AvatarStage = (() => {
     const h = Math.max(1, Math.round(canvas.clientHeight * dpr));
     if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
     const g = canvas.getContext("2d");
+    if (AvatarGL.draw(m, tx, angle, w, h)) { g.clearRect(0, 0, w, h); g.drawImage(AvatarGL.canvas(), 0, 0); return; }
     const bytes = AvatarCore.render(m, angle, w, h, tx, zoom);
     g.putImageData(new ImageData(bytes, w, h), 0, 0);
   }
