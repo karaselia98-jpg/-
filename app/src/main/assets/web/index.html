@@ -5161,12 +5161,20 @@ async function copyAvatarFrom(name) {
   const look = await r.json().catch(() => ({}));
   if (!r.ok || !look.definition) throw new Error(look.error || "The avatar service didn't answer.");
   const worn = Parse.worn(await httpGet("https://avatar.roblox.com/v2/avatar/users/" + user.id + "/avatar"));
+  // every worn item becomes an owned item in Customize (bundles too), with its picture
   const items = [];
   for (const w of worn) {
+    if (w.bundle) { items.push({ ...makeItem({ id: w.id, bundle: true, name: w.name || "Bundle" }), wearing: true }); continue; }
     const t = await httpGet("https://economy.roblox.com/v2/assets/" + w.id + "/details").catch(() => null);
     const it = t ? Parse.asset(t) : null;
     if (it) { it.wearing = true; items.push(it); }
   }
+  const assetIds = items.filter(i => !i.bundle).map(i => i.id);
+  const bundleIds = items.filter(i => i.bundle).map(i => i.id);
+  const pics = {};
+  if (assetIds.length) Object.assign(pics, Parse.images(await httpGet(robloxUrl("https://thumbnails.roblox.com/v1/assets", { assetIds: assetIds.join(","), size: "420x420", format: "Png" })).catch(() => "{}")));
+  if (bundleIds.length) Object.assign(pics, Parse.images(await httpGet(robloxUrl("https://thumbnails.roblox.com/v1/bundles/thumbnails", { bundleIds: bundleIds.join(","), size: "420x420", format: "Png" })).catch(() => "{}")));
+  for (const i of items) i.thumb = pics[i.id] || null;
   Profile.adopt(st.profile, items);
   st.profile.definition = look.definition;
   lookBase = look.definition;
