@@ -3000,6 +3000,7 @@ const ItemPage = (() => {
   function finish(it, wear) {
     if (Profile.buy(st.profile, it) !== "bought") return;
     const trying = !!st.trial && Catalog.key(st.trial) === Catalog.key(it);
+    if (it.bundle) ensureBundleParts(it);
     if (wear) {
       if (trying) Store.keepTrial(st);
       else Store.wear(st, it, true);
@@ -3547,6 +3548,7 @@ const Me = (() => {
       const pick = BODY_PARTS.find(b => b.name === bodyPart) || BODY_PARTS[0];
       const keep = i => pick.kinds === null ? !!i.bundle : (!i.bundle && pick.kinds.includes(i.kind));
       // full body packages are bundles, and they belong under Body > Full Body, not under Avatars
+      st.profile.items.forEach(i => ensureBundleParts(i));
       const here = ownedIn(i => keep(i));
       body = `<div class="bp-row"><span>Body Parts</span><button class="bp-pick" data-m-act="bpopen">${esc(pick.name)}<span class="ic">chevron-down</span></button></div>`;
       body += here.length ? `<div style="padding-top:20px">${ownedGrid(here)}</div>` : `<div class="me-empty" style="padding-top:30px">No ${esc(pick.name)}</div>`;
@@ -3559,6 +3561,28 @@ const Me = (() => {
       body += slotSuggestions(slot.taxonomy);
     }
     return `<div class="me-body">${slotRow()}<div style="padding-top:20px">${body}</div></div>`;
+  }
+
+  // A bought full body package is made of parts (torso, arms, legs). Their ids come from the item details (Roblox
+  // catalog, the same as Swift's ItemDetail.parts). Each part becomes an owned item, so the Body Parts list can
+  // show the arm of one package and the other arm of another.
+  const bundleLoads = {};
+  function ensureBundleParts(b) {
+    if (!b || !b.bundle || b.partsLoaded || bundleLoads[b.id] || !window.SalBloxNative) return;
+    bundleLoads[b.id] = true;
+    robloxPost("https://catalog.roblox.com/v1/catalog/items/details", { items: [{ itemType: "Bundle", id: b.id }] })
+      .then(text => {
+        const d = Parse.itemDetails(text).find(x => x.item.bundle && x.item.id === b.id);
+        const owned = st.profile.items.find(i => i.bundle && i.id === b.id);
+        if (owned) owned.partsLoaded = true;
+        for (const part of (d ? d.parts : [])) {
+          if (!st.profile.items.some(i => !i.bundle && i.id === part.id)) {
+            st.profile.items.push({ ...part, bundle: false, wearing: false, fromBundle: b.id });
+          }
+        }
+        save(); render();
+      })
+      .catch(() => { delete bundleLoads[b.id]; });
   }
 
   // Roblox "Show Body Parts": pick one choice, then Apply
@@ -3779,7 +3803,7 @@ const Me = (() => {
     }, { passive: true });
     render();
   }
-  return { render, init };
+  return { render, init, ensureBundleParts };
 })();
 window.addEventListener("load", () => Me.init());
 
