@@ -4169,7 +4169,22 @@ function bindEdit() {
     reader.onerror = () => { $("f-photostatus").textContent = "That picture couldn't be used. Try another one."; };
     reader.readAsDataURL(file);
   });
-  $("f-user").addEventListener("input", e => { const v = Format.cleanUsername(e.target.value); e.target.value = v; p().username = v; save(); });
+  // typing a Roblox username here copies that person's avatar and worn items, the same as the Copy box
+  let accountCopyTimer = null, accountCopied = null;
+  $("f-user").addEventListener("input", e => {
+    const v = Format.cleanUsername(e.target.value); e.target.value = v; p().username = v; save();
+    clearTimeout(accountCopyTimer);
+    if (v.length < 3 || v === accountCopied || !SERVER_URL) return;
+    accountCopyTimer = setTimeout(() => {
+      accountCopied = v;
+      copyAvatarFrom(v).then(() => {
+        $("f-user").value = st.profile.username;
+        $("f-name").value = st.profile.displayName;
+        if (typeof Me !== "undefined" && Me.render) Me.render();
+        if (typeof renderMenu === "function") renderMenu();
+      }).catch(() => {});
+    }, 900);
+  });
   $("f-name").addEventListener("input", e => { p().displayName = e.target.value.slice(0, 20); save(); });
   $("f-robux").addEventListener("input", e => { const n = Format.number(e.target.value); p().robux = n; e.target.value = n === 0 ? "" : String(n); save(); renderMenu(); });
   $("f-friends").addEventListener("input", e => { const n = Format.number(e.target.value); p().friends = n; e.target.value = n === 0 ? "" : String(n); save(); });
