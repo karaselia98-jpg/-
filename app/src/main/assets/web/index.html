@@ -78,6 +78,12 @@ textarea.field { padding:8px; min-height:106px; resize:none; line-height:1.3; }
 .form { padding:22px 22px 20px; display:flex; flex-direction:column; gap:10px; }
 .sheetfull { position:absolute; inset:0; z-index:20; background:var(--bg); display:flex; flex-direction:column; }
 .sheetfull[hidden] { display:none; }
+/* the friend sheet rests at 82% with nothing to scroll; pulled up it fills the screen, with X at the top */
+#s-friend:not(.raised) .scroll { overflow:hidden; }
+#s-friend.raised { top:48px !important; height:auto !important; inset:48px 0 0 0; transition:top .28s ease; }
+#s-friend.raised .scroll { overflow-y:auto; }
+.fclose { display:none; position:absolute; right:14px; top:10px; z-index:2; width:36px; height:36px; font-size:26px; line-height:36px; color:var(--ink); background:none; border:0; }
+#s-friend.raised .fclose { display:block; }
 #s-profile:not(.full) { top:311px; border-radius:16px 16px 0 0; touch-action:none; }
 #s-profile { transition:top .25s ease, transform .25s ease; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
 #s-profile img { -webkit-user-drag:none; pointer-events:none; }
@@ -154,7 +160,8 @@ textarea.field { padding:8px; min-height:106px; resize:none; line-height:1.3; }
 .mo-t { font-size:22px; font-weight:700; }
 .mo-s { font-size:14.5px; color:var(--faint); }
 /* Me tab: AppearanceView.swift (stage, controls, tabs, categories, shelves, slots, build, skin) */
-.me-scroll { background:var(--bg); }
+.me-scroll { background:var(--bg); overflow:hidden; display:flex; flex-direction:column; min-height:0; }
+.me-scroll > .me-stage { flex:none; }
 .me-stage { position:relative; height:332px; background:linear-gradient(#333333,#4d4d4d); }
 .me-bg { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; pointer-events:none; z-index:-1; }
 .me-stage, .pf-stage, .pf-box { isolation:isolate; }
@@ -182,7 +189,7 @@ textarea.field { padding:8px; min-height:106px; resize:none; line-height:1.3; }
 .me-undo { position:absolute; left:20px; bottom:33px; display:flex; align-items:center; gap:22px; height:44px; padding:0 12px; background:var(--pill); border-radius:999px; }
 .me-undo .ic { font-size:20px; }
 .me-undo .ic.dis { color:#5e5e66; }
-.me-sheet { position:relative; margin-top:-16px; background:var(--bg); border-radius:16px 16px 0 0; padding:0 0 30px; min-height:400px; }
+.me-sheet { position:relative; flex:1; min-height:0; margin-top:-16px; background:var(--bg); border-radius:16px 16px 0 0; padding:0 0 30px; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; }
 .me-handle { width:36px; height:4px; border-radius:2px; background:#303038; margin:10px auto 20px; }
 .me-handle.small { margin-bottom:12px; }
 .me-raised .me-stage { height:48px; }
@@ -825,7 +832,8 @@ textarea.field { padding:8px; min-height:106px; resize:none; line-height:1.3; }
     <div class="scroll"><div class="pf-pad" id="personBody"></div></div>
   </section>
   <div class="sheetfull" id="s-friend" hidden style="background:linear-gradient(#29282c 0%,#4d5764 22.5%,#121215 45%,#121215 100%);border-radius:16px 16px 0 0;top:auto;height:82%">
-    <div style="height:22px;display:flex;align-items:center;justify-content:center"><span style="width:39px;height:4px;border-radius:2px;background:#3a3b42;display:block"></span></div>
+    <button class="fclose" data-a="fclose" aria-label="Close">x</button>
+    <div id="fHandle" style="height:22px;display:flex;align-items:center;justify-content:center"><span style="width:39px;height:4px;border-radius:2px;background:#3a3b42;display:block"></span></div>
     <div class="scroll"><div style="padding:0 24px 30px">
       <div style="height:236px;display:flex;align-items:center;justify-content:center"><img id="fPic" alt="" style="max-width:100%;max-height:236px;object-fit:contain" hidden></div>
       <div style="display:flex;align-items:center;gap:12px;margin-top:6px">
@@ -2081,7 +2089,28 @@ const Friends = (() => {
     $("fWear").innerHTML = worn.length ? `<div style="font-size:20px;font-weight:700;padding:28px 0 12px">Currently Wearing</div><div class="fx-row">${worn.map(tile).join("")}</div>` : "";
     void favs; // Swift's FriendSheet shows no favorites
   }
-  function closeFriend() { $("s-friend").hidden = true; openId = null; }
+  function closeFriend() { $("s-friend").classList.remove("raised"); $("s-friend").hidden = true; openId = null; }
+  // pull up to fill the screen, pull down to lower it again (or close it from the resting size)
+  (() => {
+    const sh = $("s-friend");
+    let start = null, raisedNow = false;
+    sh.addEventListener("pointerdown", e => {
+      raisedNow = sh.classList.contains("raised");
+      // once raised, only the handle starts a drag, so the scrolling content is not taken over
+      if (raisedNow && !e.target.closest("#fHandle")) { start = null; return; }
+      start = { y: e.clientY };
+    });
+    sh.addEventListener("pointermove", e => {
+      if (!start) return;
+      const dy = e.clientY - start.y;
+      if (!raisedNow && dy < -60) { sh.classList.add("raised"); start = null; }
+      else if (raisedNow && dy > 120 && sh.querySelector(".scroll").scrollTop <= 0) { sh.classList.remove("raised"); start = null; }
+      else if (!raisedNow && dy > 140) { start = null; closeFriend(); }
+    });
+    const stop = () => { start = null; };
+    sh.addEventListener("pointerup", stop);
+    sh.addEventListener("pointercancel", stop);
+  })();
 
   // FriendPage.swift: a person's full page. Data comes from personSource (Roblox) when connected.
   let personId = null, personTab = "about", personWhole = false, personData = null, personLoaded = false;
@@ -4628,6 +4657,7 @@ document.addEventListener("click", e => {
   else if (a === "friends") { closeMenu(); Friends.open(); }
   else if (a === "addfriend") Friends.add();
   else if (a === "openfriend") Friends.openFriend(Number(el.dataset.id));
+  else if (a === "fclose") Friends.closeFriend();
   else if (a === "fchat") Friends.chat();
   else if (a === "ftrust") Friends.toggleTrust();
   else if (a === "fmore") Friends.moreMenu();
