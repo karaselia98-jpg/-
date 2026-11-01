@@ -3460,10 +3460,10 @@ const Me = (() => {
   }
 
   function buildPanel() {
-    const defaults = { proportion: 0, bodyType: 0 };
+    const scales = (bodyDefinition().scales || {});
     return `<div class="me-build">${RANGES.map(([key, name, min, max]) => {
-      const v = defaults[key] ?? 1;
-      return `<label>${name}<input type="range" min="${min}" max="${max}" step="0.01" value="${v}"></label>`;
+      const v = scales[key] ?? (key === "proportion" || key === "bodyType" ? 0 : 1);
+      return `<label>${name}<input type="range" data-bkey="${key}" min="${min}" max="${max}" step="0.01" value="${v}"></label>`;
     }).join("")}</div>`;
   }
 
@@ -3662,12 +3662,29 @@ const Me = (() => {
       if (keep[row.dataset.sk] !== undefined) row.scrollLeft = keep[row.dataset.sk];
     });
     el.scrollTop = up;
+    el.querySelectorAll("input[data-bkey]").forEach(inp => {
+      const [min, max] = [parseFloat(inp.min), parseFloat(inp.max)];
+      inp.addEventListener("input", () => setBuildScale(inp.dataset.bkey, parseFloat(inp.value), min, max));
+    });
     const sheetNew = el.querySelector(".me-sheet");
     if (sheetNew) sheetNew.scrollTop = sheetUp;
     const bodyNew = el.querySelector(".me-body");
     if (bodyNew) bodyNew.scrollTop = bodyUp;
   }
 
+  // The body as it is now: the saved one if the user changed it, else the one from Roblox
+  function bodyDefinition() {
+    return st.profile.definition || lookBase || { bodyColors: {}, scales: {} };
+  }
+  // Swift Avatar.setting: one slider sets one scale (rounded to 0.01, kept inside its range)
+  function setBuildScale(key, value, min, max) {
+    const def = JSON.parse(JSON.stringify(bodyDefinition()));
+    def.scales = def.scales || {};
+    def.scales[key] = Math.round(Math.min(Math.max(value, min), max) * 100) / 100;
+    st.profile.definition = def;
+    save();
+    previewWorn(st);
+  }
   let marketMoreBusy = false;
   // Category and subcategory listings (Roblox.search with a taxonomy, as in AppearanceView.swift): one list per tab
   const catLists = {};   // key -> { items: null | [], next, busy }
@@ -3803,7 +3820,7 @@ const Me = (() => {
     }, { passive: true });
     render();
   }
-  return { render, init, ensureBundleParts };
+  return { render, init, ensureBundleParts, setBuildScale };
 })();
 window.addEventListener("load", () => Me.init());
 
@@ -4794,21 +4811,24 @@ function previewWorn(st) {
   previewTimer = setTimeout(() => previewWornNow(st, 0), 1500);
 }
 function wornSignature(st) {
-  return st.profile.items.filter(i => { const o = Profile.owns(st.profile, i); return !!(o && o.wearing); })
+  // what is worn AND the body: a changed build must redraw even when the clothes are the same
+  const worn = st.profile.items.filter(i => { const o = Profile.owns(st.profile, i); return !!(o && o.wearing); })
     .map(i => (i.bundle ? "b" : "") + i.id).sort().join(",");
+  const body = st.profile.definition ? JSON.stringify(st.profile.definition.scales || {}) + JSON.stringify(st.profile.definition.bodyColors || {}) : "";
+  return worn + "#" + hashText(body);
 }
 function showDrawNote(text) {
   drawNote = text || "";
   if (text) { try { toast(text); } catch (e) {} }
 }
 async function previewWornNow(st, tries) {
-  const base = lookBase || (st && st.profile && st.profile.definition);
+  const base = (st && st.profile && st.profile.definition) || lookBase;
   if (!SERVER_URL || !base) return;
   if (previewBusy) { clearTimeout(previewTimer); previewTimer = setTimeout(() => previewWornNow(st, tries), 2000); return; }
   const sig = wornSignature(st);
   if (sig === st.profile.drawn && tries === 0) return;
   // a look drawn before in this session comes back at once (undo, redo, wearing the same things again)
-  const cacheKey = JSON.stringify(base).slice(0, 300) + "|" + sig;
+  const cacheKey = hashText(JSON.stringify(base)) + "|" + sig;
   if (!modelCache[cacheKey]) {
     try { const saved = await lookDb.get(cacheKey); if (saved) modelCache[cacheKey] = saved; } catch (e) {}
   }
@@ -4870,6 +4890,12 @@ async function previewWornNow(st, tries) {
   if (drew && wornSignature(st) !== sig_of(st)) previewWorn(st);
 }
 function sig_of(st) { return st.profile.drawn; }
+// a short fingerprint of a whole text (the body and its scales, for the look cache key)
+function hashText(text) {
+  let h = 5381;
+  for (let i = 0; i < text.length; i++) h = ((h << 5) + h + text.charCodeAt(i)) | 0;
+  return (h >>> 0).toString(16) + "-" + text.length;
+}
 
 async function loadMyAvatar() {
   if (!SERVER_URL) return;
