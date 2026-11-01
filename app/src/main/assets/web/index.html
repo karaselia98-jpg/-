@@ -3812,7 +3812,23 @@ function bindEdit() {
     }
     $("f-copy").disabled = !$("f-copyuser").value.trim();
   });
-  $("f-addfriend").addEventListener("input", e => { $("f-addbtn").disabled = true; });
+  $("f-addfriend").addEventListener("input", e => { $("f-addbtn").disabled = !e.target.value.trim(); });
+  $("f-addbtn").addEventListener("click", async () => {
+    const who = $("f-addfriend").value.trim();
+    if (!who) return;
+    $("f-addbtn").disabled = true;
+    $("f-friendstatus").textContent = "Adding…";
+    try {
+      const added = await addFriendSource(who);
+      $("f-friendstatus").textContent = added ? "Added " + who + "." : who + " is already in your friends.";
+      $("f-addfriend").value = "";
+      fillFriendRows();
+      Home.render();
+    } catch (e) {
+      $("f-friendstatus").textContent = String(e && e.message || e);
+    }
+    $("f-addbtn").disabled = !$("f-addfriend").value.trim();
+  });
   $("f-photo").addEventListener("change", e => {
     const file = e.target.files && e.target.files[0];
     e.target.value = "";
@@ -4659,6 +4675,31 @@ async function copyAvatarFrom(name) {
   save();
   return items.length;
 }
+const countOf = t => { try { return JSON.parse(t).count ?? null; } catch (e) { return null; } };
+// Add a real Roblox user to the friends list (Store.addFriend and Roblox.person in Swift). Saved on the phone only.
+async function robloxAddFriend(name) {
+  const user = Parse.user(await robloxPost("https://users.roblox.com/v1/usernames/users", { usernames: [name], excludeBannedUsers: true }));
+  if (!user) throw new Error("No Roblox user with that name.");
+  const [bio, shot, friends, followers, following] = await Promise.all([
+    httpGet("https://users.roblox.com/v1/users/" + user.id).then(Parse.person, () => null),
+    httpGet("https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=" + user.id + "&size=150x150&format=Png").then(Parse.images, () => ({})),
+    httpGet("https://friends.roblox.com/v1/users/" + user.id + "/friends/count").then(countOf, () => null),
+    httpGet("https://friends.roblox.com/v1/users/" + user.id + "/followers/count").then(countOf, () => null),
+    httpGet("https://friends.roblox.com/v1/users/" + user.id + "/followings/count").then(countOf, () => null),
+  ]);
+  const f = {
+    id: user.id, name: user.name, displayName: user.displayName, verified: user.verified,
+    headshot: shot[user.id] || null,
+    bio: bio ? bio.bio : "",
+    friends: friends ?? null, followers: followers ?? null, following: following ?? null,
+  };
+  const i = st.profile.friendList.findIndex(x => x.id === user.id);
+  if (i >= 0) { st.profile.friendList[i] = { ...st.profile.friendList[i], ...f }; save(); return false; }
+  st.profile.friendList.push(f);
+  save();
+  return true;
+}
+addFriendSource = robloxAddFriend;
 async function homeSourceNative() {
   const sid = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random());
   const sorts = Parse.sorts(await httpGet("https://apis.roblox.com/explore-api/v1/get-sorts?sessionId=" + encodeURIComponent(sid)));
