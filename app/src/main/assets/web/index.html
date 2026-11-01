@@ -2871,6 +2871,7 @@ const ItemPage = (() => {
     if (!owned) return;
     Store.wear(st, shown, !owned.wearing);
     save();
+    previewWorn(st);
     refreshOpenScreens();
   }
 
@@ -2938,6 +2939,7 @@ const ItemPage = (() => {
       Store.tryOn(st, null);
     }
     save();
+    previewWorn(st);
     refreshOpenScreens();
   }
 
@@ -3621,8 +3623,8 @@ const Me = (() => {
     else if (a === "sub") { sub = sub === v ? null : v; }
     else if (a === "shelf") { shelf = v; }
     else if (a === "slot") { picked[shelf] = v; }
-    else if (a === "undo") { if (Store.undo(st)) save(); }
-    else if (a === "redo") { if (Store.redo(st)) save(); }
+    else if (a === "undo") { if (Store.undo(st)) { save(); previewWorn(st); } }
+    else if (a === "redo") { if (Store.redo(st)) { save(); previewWorn(st); } }
     render();
   }
 
@@ -4537,8 +4539,15 @@ function paintPhotos() {
 // Try-on: the server draws the avatar with the worn items (POST /look with wear). Nothing is written to Roblox.
 let lookBase = null;   // the user's own avatar definition, from the last /look
 let previewSeq = 0;
-async function previewWorn(st) {
-  if (!SERVER_URL || !lookBase) return;
+let previewTimer = null;
+// Called after every change to what is worn. Waits 0.4 s so several quick taps send one request.
+function previewWorn(st) {
+  clearTimeout(previewTimer);
+  previewTimer = setTimeout(() => previewWornNow(st), 400);
+}
+async function previewWornNow(st) {
+  const base = lookBase || (st && st.profile && st.profile.definition);
+  if (!SERVER_URL || !base) return;
   const wear = st.profile.items
     .filter(i => { const o = Profile.owns(st.profile, i); return !!(o && o.wearing); })
     .map(i => ({ id: i.id, bundle: !!i.bundle }));
@@ -4546,7 +4555,7 @@ async function previewWorn(st) {
   try {
     const r = await fetch(SERVER_URL + "/look", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ base: lookBase, wear })
+      body: JSON.stringify({ base, wear })
     });
     const body = await r.json().catch(() => ({}));
     if (!r.ok || seq !== previewSeq || !body.model || !body.model.obj) return;
