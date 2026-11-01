@@ -791,6 +791,7 @@ textarea.field { padding:8px; min-height:106px; resize:none; line-height:1.3; }
         <div style="min-width:0"><div class="fname" id="fDisplay"></div><div class="fuser" id="fUser"></div></div>
       </div>
       <div id="fBio" style="font-size:14.5px;color:var(--faint);margin-top:18px">No bio yet</div>
+      <div id="fCounts" style="display:flex;gap:18px;margin-top:14px;font-size:14.5px;color:var(--faint)"></div>
       <div class="fbtns">
         <button class="gbtn" data-a="fchat">Chat</button>
         <button class="gbtn" id="fTrustBtn" data-a="ftrust">Add trusted friend</button>
@@ -1995,6 +1996,15 @@ const Friends = (() => {
     $("fUser").textContent = "@" + f.name;
     $("fSheetNote").textContent = "";
     $("fTrustBtn").textContent = "Add trusted friend";
+    // the picture, bio and counts saved when the friend was added (FriendSheet.swift shows the same)
+    const av = $("fAv");
+    av.style.backgroundImage = f.headshot ? `url("${f.headshot}")` : "";
+    av.style.backgroundSize = "cover";
+    $("fBio").textContent = f.bio || "No bio yet";
+    const n = v => (v === null || v === undefined ? "--" : Format.grouped(v));
+    $("fCounts").innerHTML = `<span><b style="color:var(--ink)">${n(f.friends)}</b> Friends</span>`
+      + `<span><b style="color:var(--ink)">${n(f.followers)}</b> Followers</span>`
+      + `<span><b style="color:var(--ink)">${n(f.following)}</b> Following</span>`;
     $("s-friend").hidden = false;
   }
   function closeFriend() { $("s-friend").hidden = true; openId = null; }
