@@ -4951,7 +4951,7 @@ async function previewWornNow(st, tries) {
   previewBusy = true;
   const wear = st.profile.items
     .filter(i => { const o = Profile.owns(st.profile, i); return !!(o && o.wearing); })
-    .map(i => ({ id: i.id, bundle: !!i.bundle }));
+    .map(i => ({ id: i.id, bundle: !!i.bundle, kind: i.kind ?? null }));
   const seq = ++previewSeq;
   let drew = false;
   try {
