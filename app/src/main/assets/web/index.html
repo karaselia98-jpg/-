@@ -2969,7 +2969,7 @@ const ItemPage = (() => {
     $("ipPic").hidden = !it.thumb;
     $("ipCreatorRow").hidden = !it.creator;
     $("ipCreator").innerHTML = escapeHtml(it.creator || "")
-      + (Catalog.showsCreatorCheck(it) ? ` <span class="ic ip-ver">verified-backplate</span>` : "");
+      + (Catalog.showsCreatorCheck(it) ? ` <span class="pf-ver" style="font-size:14px"><span class="ic">verified-backplate</span><span class="ic vb2">verified-check</span></span>` : "");
     $("ipOwn").hidden = !owned;
     if (owned) $("ipOwn").innerHTML = `<span class="ic">circle-check</span>${owned.wearing ? "You own this item and are wearing it" : "You own this item"}`;
     $("ipNote").hidden = !(!owned && (it.price === null || it.price === undefined));
