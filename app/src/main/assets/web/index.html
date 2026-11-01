@@ -33,6 +33,7 @@ button, input, textarea { font:inherit; color:inherit; }
 button { cursor:pointer; background:none; border:0; padding:0; }
 button:active { transform:scale(.98); }
 .ic { font-family:BuilderIcons; font-size:24px; line-height:1; display:inline-block; user-select:none; }
+button.ic { color:var(--ink); background:none; border:0; padding:0; }
 #app { width:100%; max-width:430px; height:100vh; height:100dvh; background:var(--bg); position:relative; overflow:hidden; }
 .screen { position:absolute; inset:0; background:var(--bg); display:flex; flex-direction:column; }
 .screen[hidden] { display:none; }
@@ -4469,7 +4470,7 @@ const SendRobuxSheet = (() => {
       ${avatar(f, 48)}<span style="font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(f.displayName)}</span></button>`).join("");
     return `
       <div style="display:flex;align-items:center;gap:10px;height:39px;margin-top:16px;padding:0 14px;border:1px solid var(--tile);border-radius:20px">
-        <span class="ic" style="font-size:20px">magnifying-glass</span>
+        <span class="ic" style="font-size:20px;color:var(--ink)">magnifying-glass</span>
         <input placeholder="Search" value="${escapeHtml(search)}" autocomplete="off" autocapitalize="none"
           oninput="SendRobuxSheet.setSearch(this.value)" style="flex:1;min-width:0;background:none;border:0;outline:0;color:var(--ink);font:inherit;font-size:13.7px">
       </div>
