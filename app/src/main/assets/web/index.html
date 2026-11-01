@@ -5006,6 +5006,22 @@ async function loadMyAvatar() {
   console.log("[avatar] start, user =", JSON.stringify(user), "seq", seq);
   if (!user || user === "Player1") return;
   if (loadedFor === user) return;
+  // the look drawn last time is kept on this phone: show it at once and skip the server
+  try {
+    const base = st.profile.definition;
+    if (base) {
+      const key = hashText(JSON.stringify(base)) + "|" + wornSignature(st);
+      const saved = modelCache[key] || await lookDb.get(key);
+      if (saved) {
+        modelCache[key] = saved;
+        if (seq !== lookSeq) return;
+        await AvatarStage.setModel(saved);
+        st.profile.drawn = wornSignature(st);
+        loadedFor = user;
+        return;
+      }
+    }
+  } catch (e) {}
   // show the last picture and background at once, while the server answers
   try {
     const saved = JSON.parse(localStorage.getItem("salblox-look-" + user) || "null");
@@ -5042,7 +5058,14 @@ async function loadMyAvatar() {
     const files = {};
     for (const u of model.textures || []) files[u.split("/").pop()] = u;
     if (seq !== lookSeq) return;
-    await AvatarStage.setModel({ obj, mtl, textures: files, bodyColors: (body.definition || {}).bodyColors });
+    const payload = { obj, mtl, textures: files, bodyColors: (body.definition || {}).bodyColors };
+    await AvatarStage.setModel(payload);
+    if (body.definition) {
+      if (!st.profile.definition) st.profile.definition = body.definition;
+      const key = hashText(JSON.stringify(st.profile.definition)) + "|" + wornSignature(st);
+      modelCache[key] = payload;
+      try { lookDb.put(key, payload); } catch (e) {}
+    }
     // the server draws the Roblox avatar as it is there; the app's own worn list (saved on this phone) wins
     if (st.profile.items.some(i => i.wearing)) previewWornNow(st);
     // like install(_:) in Store.swift: with no picture from the server, the round picture is a snapshot of the 3D avatar
