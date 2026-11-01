@@ -5651,8 +5651,11 @@ const AvatarStage = (() => {
 
   function clear() { model = null; textures = {}; refreshSoon(); }
 
+  // The one 3D model is yours: it is drawn only on your own pages. Other people's pages (friend sheet and their
+  // full profile) show their picture, never your avatar.
   function targets() {
-    return [...document.querySelectorAll(".pf-stage, .me-stage, #fpBox")];
+    return [...document.querySelectorAll(".pf-stage, .me-stage, #fpBox")]
+      .filter(box => !box.closest("#s-person, #s-friend"));
   }
 
   function paint(canvas) {
