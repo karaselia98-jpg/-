@@ -4119,6 +4119,7 @@ function bindEdit() {
       const n = await copyAvatarFrom(name);
       $("f-copystatus").textContent = "Copied " + name + "'s avatar and " + n + " worn items.";
       if (typeof Me !== "undefined" && Me.render) Me.render();
+      if (typeof Home !== "undefined" && Home.render) Home.render();
       if (typeof renderMenu === "function") renderMenu();
     } catch (e) {
       $("f-copystatus").textContent = String(e && e.message || e);
@@ -4181,6 +4182,7 @@ function bindEdit() {
         $("f-user").value = st.profile.username;
         $("f-name").value = st.profile.displayName;
         if (typeof Me !== "undefined" && Me.render) Me.render();
+        if (typeof Home !== "undefined" && Home.render) Home.render();
         if (typeof renderMenu === "function") renderMenu();
       }).catch(() => {});
     }, 900);
@@ -5263,6 +5265,29 @@ async function copyAvatarFrom(name) {
   st.profile.username = user.name;
   st.profile.displayName = user.displayName || user.name;
   st.profile.verified = !!user.verified;
+  // the profile's numbers, bio and friends come from the same Roblox user
+  const uid = user.id;
+  const [who, fr, fo, fg, friendsRes] = await Promise.all([
+    httpGet("https://users.roblox.com/v1/users/" + uid).then(Parse.person, () => null).catch(() => null),
+    httpGet("https://friends.roblox.com/v1/users/" + uid + "/friends/count").then(countOf, () => null),
+    httpGet("https://friends.roblox.com/v1/users/" + uid + "/followers/count").then(countOf, () => null),
+    httpGet("https://friends.roblox.com/v1/users/" + uid + "/followings/count").then(countOf, () => null),
+    httpGet("https://friends.roblox.com/v1/users/" + uid + "/friends?limit=12").catch(() => null),
+  ]);
+  if (who) st.profile.bio = who.bio || "";
+  if (fr !== null) st.profile.friends = fr;
+  if (fo !== null) st.profile.followers = fo;
+  if (fg !== null) st.profile.following = fg;
+  const theirFriends = friendsRes ? Parse.users(friendsRes) : [];
+  if (theirFriends.length) {
+    const faces = await httpGet("https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=" + theirFriends.map(f => f.id).join(",") + "&size=150x150&format=Png")
+      .then(Parse.images, () => ({})).catch(() => ({}));
+    for (const f of theirFriends) {
+      if (st.profile.friendList.some(x => x.id === f.id)) continue;
+      st.profile.friendList.push({ id: f.id, name: f.name, displayName: f.displayName, verified: !!f.verified, headshot: faces[f.id] || null,
+        bio: "", friends: null, followers: null, following: null });
+    }
+  }
   loadedFor = null;
   await applyLookBody(look);
   save();
