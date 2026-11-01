@@ -4617,36 +4617,75 @@ function paintPhotos() {
 let lookBase = null;   // the user's own avatar definition, from the last /look
 let previewSeq = 0;
 let previewTimer = null;
-// Called after every change to what is worn. Waits 0.4 s so several quick taps send one request.
+let previewBusy = false;
+let drawNote = "";
+// Swift Store.drawSoon / redraw: wait 1.5 s after the last change, check the hourly budget, skip a look that is
+// already drawn, and try again when the server is busy.
 function previewWorn(st) {
   clearTimeout(previewTimer);
-  previewTimer = setTimeout(() => previewWornNow(st), 400);
+  previewTimer = setTimeout(() => previewWornNow(st, 0), 1500);
 }
-async function previewWornNow(st) {
+function wornSignature(st) {
+  return st.profile.items.filter(i => { const o = Profile.owns(st.profile, i); return !!(o && o.wearing); })
+    .map(i => (i.bundle ? "b" : "") + i.id).sort().join(",");
+}
+function showDrawNote(text) {
+  drawNote = text || "";
+  if (text) { try { toast(text); } catch (e) {} }
+}
+async function previewWornNow(st, tries) {
   const base = lookBase || (st && st.profile && st.profile.definition);
   if (!SERVER_URL || !base) return;
+  if (previewBusy) { clearTimeout(previewTimer); previewTimer = setTimeout(() => previewWornNow(st, tries), 2000); return; }
+  const sig = wornSignature(st);
+  if (sig === st.profile.drawn && tries === 0) return;
+  // the hourly budget: when fewer than 2 looks are left, wait until the hour resets (Swift Store.drawSoon)
+  try {
+    const b = await fetch(SERVER_URL + "/budget").then(r => (r.ok ? r.json() : null)).catch(() => null);
+    if (b && b.left !== undefined && b.left !== null && b.left < 2 && b.resetIn > 0) {
+      showDrawNote("Your avatar updates in " + Math.max(1, Math.ceil(b.resetIn / 60)) + " min");
+      clearTimeout(previewTimer);
+      previewTimer = setTimeout(() => previewWornNow(st, 0), (b.resetIn + 3) * 1000);
+      return;
+    }
+  } catch (e) {}
+  previewBusy = true;
   const wear = st.profile.items
     .filter(i => { const o = Profile.owns(st.profile, i); return !!(o && o.wearing); })
     .map(i => ({ id: i.id, bundle: !!i.bundle }));
   const seq = ++previewSeq;
+  let drew = false;
   try {
     const r = await fetch(SERVER_URL + "/look", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ base, wear })
     });
     const body = await r.json().catch(() => ({}));
-    if (!r.ok || seq !== previewSeq || !body.model || !body.model.obj) return;
+    if (!r.ok || !body.model || !body.model.obj) throw new Error(r.status === 429 ? "busy" : "no model");
+    if (seq !== previewSeq) { previewBusy = false; return; }
     if (body.image) probePic(body.image);
     const obj = await (await fetch(body.model.obj)).text();
     const mtl = body.model.mtl ? await (await fetch(body.model.mtl)).text() : "";
     const files = {};
     for (const u of body.model.textures || []) files[u.split("/").pop()] = u;
-    if (seq !== previewSeq) return;
     await AvatarStage.setModel({ obj, mtl, textures: files, bodyColors: (body.definition || {}).bodyColors });
+    st.profile.drawn = sig;
+    try { save(); } catch (e) {}
+    drew = true;
+    showDrawNote("");
   } catch (e) {
     console.log("[avatar] preview failed:", e && e.message);
+    // busy or offline: try again soon at first, then later (Swift: 6 s, 6 s, 60 s, 60 s)
+    if (tries < 4) {
+      clearTimeout(previewTimer);
+      previewTimer = setTimeout(() => previewWornNow(st, tries + 1), (tries < 2 ? 6 : 60) * 1000);
+    } else showDrawNote("Your avatar couldn't update. Try again later.");
+  } finally {
+    previewBusy = false;
   }
+  if (drew && wornSignature(st) !== sig_of(st)) previewWorn(st);
 }
+function sig_of(st) { return st.profile.drawn; }
 
 async function loadMyAvatar() {
   if (!SERVER_URL) return;
