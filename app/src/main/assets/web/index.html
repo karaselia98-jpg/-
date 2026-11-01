@@ -4873,7 +4873,8 @@ let drawNote = "";
 // already drawn, and try again when the server is busy.
 function previewWorn(st) {
   clearTimeout(previewTimer);
-  previewTimer = setTimeout(() => previewWornNow(st, 0), 1500);
+  // short wait so several taps become one redraw, but the change starts at once
+  previewTimer = setTimeout(() => previewWornNow(st, 0), 350);
 }
 function wornSignature(st) {
   // what is worn AND the body: a changed build must redraw even when the clothes are the same
@@ -4928,8 +4929,10 @@ async function previewWornNow(st, tries) {
     if (!r.ok || !body.model || !body.model.obj) throw new Error(r.status === 429 ? "busy" : "no model");
     if (seq !== previewSeq) { previewBusy = false; return; }
     if (body.image) probePic(body.image);
-    const obj = await (await fetch(body.model.obj)).text();
-    const mtl = body.model.mtl ? await (await fetch(body.model.mtl)).text() : "";
+    const [obj, mtl] = await Promise.all([
+      fetch(body.model.obj).then(r => r.text()),
+      body.model.mtl ? fetch(body.model.mtl).then(r => r.text()) : Promise.resolve(""),
+    ]);
     const files = {};
     for (const u of body.model.textures || []) files[u.split("/").pop()] = u;
     const payload = { obj, mtl, textures: files, bodyColors: (body.definition || {}).bodyColors };
@@ -5855,9 +5858,9 @@ const AvatarStage = (() => {
     parsed.materials = AvatarCore.parseMtl(mtl);
     tintBodyParts(parsed.materials, bodyColors);
     const loaded = {};
-    for (const [name, src] of Object.entries(files)) {
-      try { loaded[name] = decode(await loadImage(src)); } catch (e) { /* missing picture: keep the colour */ }
-    }
+    // all pictures download at the same time; a missing one keeps its colour
+    await Promise.all(Object.entries(files).map(([name, src]) =>
+      loadImage(src).then(img => { loaded[name] = decode(img); }, () => {})));
     return { model: parsed, textures: loaded };
   }
   async function setModel(payload) {
