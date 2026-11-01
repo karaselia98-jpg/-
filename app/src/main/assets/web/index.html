@@ -3359,6 +3359,7 @@ const Me = (() => {
   let searching = false;    // the full-screen search page (SearchPage-style field + Recent Searches)
   let typed = "";           // text in the search field
   let query = "";           // the last search that was run
+  let queryTax = undefined; // the section that search ran in (undefined: the whole marketplace)
   let marketItems = null;   // results for `query`: null while loading, [] when nothing came back
   let raised = false;       // the sheet is pulled up (Raise/Lower the list)
   let sort = "Relevance";   // Sort menu: Relevance, Price: low to high, Price: high to low
@@ -3748,7 +3749,7 @@ const Me = (() => {
     if (!query || !marketItems || !marketItems.next || marketMoreBusy || typeof marketSource !== "function") return;
     const run = query, cursor = marketItems.next;
     marketMoreBusy = true; render();
-    marketSource(run, cursor).then(list => {
+    marketSource(run, cursor, queryTax).then(list => {
       if (query !== run || !marketItems) return;
       marketItems = marketItems.concat(list); marketItems.next = list.next; marketMoreBusy = false; render();
     }).catch(() => { marketMoreBusy = false; render(); });
@@ -3759,11 +3760,14 @@ const Me = (() => {
     const list = readRecents().filter(x => x.toLowerCase() !== q.toLowerCase());
     writeRecents([q, ...list].slice(0, 12));
     query = q; typed = ""; searching = false;
+    // a search made inside a section (Accessories > Head) only looks in that section
+    const tax = (category !== "All" || sub) ? catTaxonomy() : undefined;
+    queryTax = tax || undefined;
     marketItems = null;
     render();
     const run = q;
     if (typeof marketSource === "function") {
-      marketSource(q).then(list => { if (query === run) { marketItems = list; render(); } })
+      marketSource(q, undefined, queryTax).then(list => { if (query === run) { marketItems = list; render(); } })
         .catch(() => { if (query === run) { marketItems = []; render(); } });
     } else { marketItems = []; render(); }
   }
@@ -3823,8 +3827,8 @@ const Me = (() => {
     if (a === "sortpick") { sort = v; sortOpen = false; render(); return; }
     if (a === "forget") { writeRecents(readRecents().filter(x => x !== v)); render(); return; }
     if (a === "mode") { mode = v; }
-    else if (a === "cat") { category = v; sub = null; }
-    else if (a === "sub") { sub = sub === v ? null : v; }
+    else if (a === "cat") { category = v; sub = null; query = ""; marketItems = null; queryTax = undefined; }
+    else if (a === "sub") { sub = sub === v ? null : v; query = ""; marketItems = null; queryTax = undefined; }
     else if (a === "shelf") { shelf = v; }
     else if (a === "slot") { picked[shelf] = v; }
     else if (a === "bpopen") { bodyPartDraft = bodyPart; bodyPartSheet = true; }
