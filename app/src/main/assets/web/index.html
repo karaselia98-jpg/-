@@ -5816,10 +5816,13 @@ const AvatarStage = (() => {
       const from = angle;
       const to = angle + velocity * 1000 * 0.012 * 0.25;
       const t0 = performance.now();
+      // the same model choice as refresh(): a friend's page shows their model, yours shows yours
       const step = now => {
         const t = Math.min(1, (now - t0) / 600);
         angle = from + (to - from) * (1 - Math.pow(1 - t, 3));
-        paint(canvas);
+        const person = onPersonPage(canvas.parentElement);
+        const m = person ? personModel : model;
+        if (m) paint(canvas, m, person ? personTextures : textures);
         spinning = t < 1 ? requestAnimationFrame(step) : null;
       };
       spinning = requestAnimationFrame(step);
