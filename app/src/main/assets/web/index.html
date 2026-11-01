@@ -4753,7 +4753,39 @@ let lookBase = null;   // the user's own avatar definition, from the last /look
 let previewSeq = 0;
 let previewTimer = null;
 let previewBusy = false;
-const modelCache = {};   // look key -> model files, kept for this session
+const modelCache = {};   // look key -> model files, kept for this session and on the phone (below)
+// Saved on the phone (IndexedDB), so a look drawn once comes back at once next time too. Any failure is ignored.
+const lookDb = (() => {
+  let db = null;
+  function open() {
+    if (db) return Promise.resolve(db);
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open("salblox-looks", 1);
+      req.onupgradeneeded = () => req.result.createObjectStore("looks");
+      req.onsuccess = () => { db = req.result; resolve(db); };
+      req.onerror = () => reject(req.error);
+    });
+  }
+  return {
+    async get(key) {
+      const d = await open();
+      return new Promise((resolve, reject) => {
+        const r = d.transaction("looks").objectStore("looks").get(key);
+        r.onsuccess = () => resolve(r.result || null);
+        r.onerror = () => reject(r.error);
+      });
+    },
+    async put(key, value) {
+      const d = await open();
+      return new Promise((resolve, reject) => {
+        const tx = d.transaction("looks", "readwrite");
+        tx.objectStore("looks").put(value, key);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+    },
+  };
+})();
 let drawNote = "";
 // Swift Store.drawSoon / redraw: wait 1.5 s after the last change, check the hourly budget, skip a look that is
 // already drawn, and try again when the server is busy.
@@ -4777,6 +4809,9 @@ async function previewWornNow(st, tries) {
   if (sig === st.profile.drawn && tries === 0) return;
   // a look drawn before in this session comes back at once (undo, redo, wearing the same things again)
   const cacheKey = JSON.stringify(base).slice(0, 300) + "|" + sig;
+  if (!modelCache[cacheKey]) {
+    try { const saved = await lookDb.get(cacheKey); if (saved) modelCache[cacheKey] = saved; } catch (e) {}
+  }
   if (modelCache[cacheKey]) {
     await AvatarStage.setModel(modelCache[cacheKey]);
     st.profile.drawn = sig;
@@ -4814,6 +4849,7 @@ async function previewWornNow(st, tries) {
     for (const u of body.model.textures || []) files[u.split("/").pop()] = u;
     const payload = { obj, mtl, textures: files, bodyColors: (body.definition || {}).bodyColors };
     modelCache[cacheKey] = payload;
+    try { lookDb.put(cacheKey, payload); } catch (e) {}
     const keys = Object.keys(modelCache);
     if (keys.length > 20) delete modelCache[keys[0]];
     await AvatarStage.setModel(payload);
