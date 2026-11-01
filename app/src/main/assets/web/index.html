@@ -2086,9 +2086,9 @@ const Friends = (() => {
     const about = personTab === "about" ? sections.map(x => `<div class="pf-sec">${x}</div>`).join("") : "";
     const emptyNote = personLoaded && !personData ? `<div class="gretry" style="margin-top:24px" data-a="personretry">Couldn't load this person's details. Tap to try again.</div>` : "";
     $("personBody").innerHTML = `
-      <div class="pf-stage" style="height:300px;margin:0 -15px"></div>
+      <div class="pf-stage" style="height:300px;margin:0 -15px;display:flex;align-items:center;justify-content:center">${d.picture ? `<img src="${escapeHtml(d.picture)}" alt="" style="max-width:100%;max-height:300px;object-fit:contain">` : ""}</div>
       <div class="pf-head" style="margin-top:-20px">
-        <div class="pf-av"><span class="ic" style="font-size:88px;color:var(--faint)">person</span></div>
+        <div class="pf-av"${local && local.headshot ? ` style="background-image:url('${local.headshot}');background-size:cover;background-position:center"` : ""}>${local && local.headshot ? "" : `<span class="ic" style="font-size:88px;color:var(--faint)">person</span>`}</div>
         <div class="pf-namebox"><div class="pf-nameline">${escapeHtml(name)}</div><div class="pf-user">@${escapeHtml(user)}</div></div>
       </div>
       ${statusLine ? `<div style="font-size:14.5px;font-weight:500;color:var(--online);margin-top:14px">${escapeHtml(statusLine)}</div>` : ""}
@@ -4895,6 +4895,21 @@ async function robloxAddFriend(name) {
   return true;
 }
 addFriendSource = robloxAddFriend;
+// Roblox.someone(id) for the full profile page (FriendPage.swift): person, counts, picture, wearing, favorites, friends
+personSource = async (id) => {
+  const local = st.profile.friendList.find(f => f.id === id);
+  const who = await httpGet("https://users.roblox.com/v1/users/" + id).then(Parse.person, () => null);
+  const name = (local && local.name) || (who && who.name) || "";
+  const d = await robloxFriendDetails(id, name).catch(() => ({}));
+  const friendsRaw = await httpGet("https://friends.roblox.com/v1/users/" + id + "/friends").catch(() => null);
+  const friends = friendsRaw ? Parse.users(friendsRaw).slice(0, 12).map(u => ({ id: u.id, name: u.name, displayName: u.displayName, headshot: null })) : [];
+  return {
+    id, name: (who && who.name) || name, displayName: (who && who.displayName) || name, bio: who ? who.bio : "",
+    verified: who ? who.verified : false, picture: d.picture || null,
+    friends: friends, friendsCount: local ? local.friends : null,
+    wearing: d.wearing || [], favorites: d.favorites || [],
+  };
+};
 async function homeSourceNative() {
   const sid = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random());
   const sorts = Parse.sorts(await httpGet("https://apis.roblox.com/explore-api/v1/get-sorts?sessionId=" + encodeURIComponent(sid)));
