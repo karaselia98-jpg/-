@@ -314,8 +314,9 @@ textarea.field { padding:8px; min-height:106px; resize:none; line-height:1.3; }
 .pop-price { display:flex; align-items:center; gap:5px; font-size:14.5px; font-weight:700; }
 /* Swift tile(): the worn check sits in the top right corner (Color.bloxBlue check on a white circle, 24 pt, 6 pt in) */
 .fx-row { display:flex; gap:12px; overflow-x:auto; padding:10px 0 4px; }
-.fx-item { width:74px; flex:none; }
-.fx-thumb { aspect-ratio:1; background:var(--tile); border-radius:8px; overflow:hidden; }
+.fx-item { width:136px; flex:none; }
+.fullbtn { display:block; width:100%; height:48px; margin-top:24px; border-radius:8px; border:1px solid var(--ink); font-size:16px; font-weight:500; color:var(--ink); }
+.fx-thumb { aspect-ratio:1; background:var(--tile); border-radius:8px; overflow:hidden; padding:3px; }
 .fx-thumb img { width:100%; height:100%; object-fit:cover; }
 .fx-name { font-size:12px; margin-top:6px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
 .fx-game { display:flex; align-items:center; gap:10px; font-size:14.5px; padding:8px 0; }
@@ -805,15 +806,14 @@ textarea.field { padding:8px; min-height:106px; resize:none; line-height:1.3; }
       </div>
       <div id="fBio" style="font-size:14.5px;color:var(--faint);margin-top:18px">No bio yet</div>
       <div id="fCounts" style="display:flex;gap:18px;margin-top:14px;font-size:14.5px;color:var(--faint)"></div>
-      <div id="fWear"></div>
-      <div id="fFav"></div>
       <div class="fbtns">
         <button class="gbtn" data-a="fchat">Chat</button>
         <button class="gbtn" id="fTrustBtn" data-a="ftrust">Add trusted friend</button>
         <button class="gbtn more" id="fMoreBtn" data-a="fmore" aria-label="More"><span class="ic">three-dots-horizontal</span></button>
       </div>
       <div class="fnotice" id="fSheetNote"></div>
-      <button class="gbtn" data-a="fullperson" style="width:100%;margin-top:24px">View full profile</button>
+      <div id="fWear"></div>
+      <button class="fullbtn" data-a="fullperson" aria-label="View full profile">View full profile</button>
     </div></div>
   </div>
 
@@ -2040,8 +2040,8 @@ const Friends = (() => {
     const worn = f.wearing || [];
     const favs = f.favorites || [];
     const tile = i => `<div class="fx-item"><div class="fx-thumb">${i.thumb ? `<img src="${escapeHtml(i.thumb)}" alt="">` : ""}</div><div class="fx-name">${escapeHtml(i.name || "")}</div></div>`;
-    $("fWear").innerHTML = worn.length ? `<div class="pf-h">Currently Wearing</div><div class="fx-row">${worn.map(tile).join("")}</div>` : "";
-    $("fFav").innerHTML = favs.length ? `<div class="pf-h">Favorites</div>${favs.map(g => `<div class="fx-game">${g.icon ? `<img src="${escapeHtml(g.icon)}" alt="">` : ""}<span>${escapeHtml(g.name || "")}</span></div>`).join("")}` : "";
+    $("fWear").innerHTML = worn.length ? `<div style="font-size:20px;font-weight:700;margin-top:28px;margin-bottom:12px">Currently Wearing</div><div class="fx-row">${worn.map(tile).join("")}</div>` : "";
+    void favs; // Swift's FriendSheet shows no favorites
   }
   function closeFriend() { $("s-friend").hidden = true; openId = null; }
 
