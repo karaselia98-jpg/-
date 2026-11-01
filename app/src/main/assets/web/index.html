@@ -333,6 +333,17 @@ textarea.field { padding:8px; min-height:106px; resize:none; line-height:1.3; }
 .fx-name { font-size:12px; margin-top:6px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
 .fx-game { display:flex; align-items:center; gap:10px; font-size:14.5px; padding:8px 0; }
 .fx-game img { width:44px; height:44px; border-radius:8px; object-fit:cover; flex:none; }
+.bp-row { display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:17px; }
+.bp-pick { display:flex; align-items:center; gap:8px; height:40px; padding:0 14px; border-radius:20px; background:var(--tile); font-size:16px; font-weight:700; color:var(--ink); }
+.bp-pick .ic { font-size:14px; }
+.bp-scrim { position:absolute; inset:0; background:rgba(0,0,0,.55); z-index:60; }
+.bp-sheet { position:absolute; left:0; right:0; bottom:0; z-index:61; background:rgb(25,26,31); border-radius:16px 16px 0 0; padding:12px 20px 22px; }
+.bp-grab { width:39px; height:4px; border-radius:2px; background:#3a3b42; margin:0 auto 18px; }
+.bp-title { font-size:20px; font-weight:700; margin-bottom:12px; }
+.bp-opt { display:flex; align-items:center; gap:16px; width:100%; height:52px; font-size:17px; color:var(--ink); }
+.bp-radio { width:26px; height:26px; border-radius:50%; border:2px solid #fff; flex:none; box-sizing:border-box; }
+.bp-radio.on { background:radial-gradient(circle, #fff 0 6px, transparent 7px); }
+.bp-apply { display:block; width:100%; height:48px; margin-top:12px; border-radius:8px; background:#fff; color:#000; font-size:17px; font-weight:700; }
 .worn-badge { position:absolute; top:6px; right:6px; width:24px; height:24px; border-radius:50%; background:#fff; display:flex; align-items:center; justify-content:center; }
 .pop-check { display:flex; align-items:center; gap:11px; font-size:14px; margin-top:24px; text-align:left; width:100%; }
 .pop-box { width:14px; height:14px; border:1.5px solid #fff; border-radius:3px; flex:none; display:flex; align-items:center; justify-content:center; }
@@ -3476,6 +3487,16 @@ const Me = (() => {
       ${withInput ? `<input id="meDialogInput" value="${esc(value)}" placeholder="Name" autocomplete="off">` : ""}
       <div class="btns"><button class="primary" data-m-act="${okAct}">${esc(okLabel)}</button><button data-m-act="dialogclose">${esc(cancelLabel)}</button></div></div></div>`;
   }
+  // Roblox "Show Body Parts" choices. kinds = the asset types of the part (Parse.assetTypes: 27 Torso, 28 Right Arm,
+  // 29 Left Arm, 30 Left Leg, 31 Right Leg). Full Body has kinds null: it means the full body packages.
+  const BODY_PARTS = [
+    { name: "Full Body", kinds: null },
+    { name: "Torso", kinds: [27] },
+    { name: "Right Arm", kinds: [28] },
+    { name: "Left Arm", kinds: [29] },
+    { name: "Right Leg", kinds: [31] },
+    { name: "Left Leg", kinds: [30] },
+  ];
   function dialogHtml() {
     if (!outfitDialog) return "";
     const d = outfitDialog;
@@ -3521,6 +3542,16 @@ const Me = (() => {
     let body = "";
     if (slot.name === "Build") body = buildPanel();
     else if (slot.name === "Skin") body = skinPanel();
+    else if (slot.name === "Full Body") {
+      // Roblox: "Body Parts" picker. Full Body = the full body packages; the other choices are single parts
+      const pick = BODY_PARTS.find(b => b.name === bodyPart) || BODY_PARTS[0];
+      const keep = i => pick.kinds === null ? !!i.bundle : (!i.bundle && pick.kinds.includes(i.kind));
+      const here = ownedIn(i => Catalog.shelfOf(i) === shelf && keep(i));
+      body = `<div class="bp-row"><span>Body Parts</span><button class="bp-pick" data-m-act="bpopen">${esc(pick.name)}<span class="ic">chevron-down</span></button></div>`;
+      body += here.length ? `<div style="padding-top:20px">${ownedGrid(here)}</div>` : `<div class="me-empty" style="padding-top:30px">No ${esc(pick.name)}</div>`;
+      body += slotSuggestions(slot.taxonomy, keep);
+      if (bodyPartSheet) body += bodyPartsSheet();
+    }
     else {
       const here = ownedIn(i => Catalog.shelfOf(i) === shelf && holdsSlot(slot, i));
       body = here.length ? `<div style="padding-top:30px">${ownedGrid(here)}</div>` : `<div class="me-empty" style="padding-top:30px">No ${plural(slot.name)}</div>`;
@@ -3529,9 +3560,22 @@ const Me = (() => {
     return `<div class="me-body">${slotRow()}<div style="padding-top:20px">${body}</div></div>`;
   }
 
+  // Roblox "Show Body Parts": pick one choice, then Apply
+  let bodyPart = "Full Body";
+  let bodyPartSheet = false;
+  let bodyPartDraft = "Full Body";
+  function bodyPartsSheet() {
+    const opts = BODY_PARTS.map(b => `<button class="bp-opt" data-m-act="bppick" data-v="${esc(b.name)}">
+        <span class="bp-radio ${bodyPartDraft === b.name ? "on" : ""}"></span><span>${esc(b.name)}</span></button>`).join("");
+    return `<div class="bp-scrim" data-m-act="bpclose"></div><div class="bp-sheet">
+      <div class="bp-grab"></div>
+      <div class="bp-title">Show Body Parts</div>${opts}
+      <button class="bp-apply" data-m-act="bpapply">Apply</button></div>`;
+  }
+
   // Swift suggestionList: "You May Also Like" under the owned items of a slot, from the slot's catalog taxonomy
   const slotLists = {};
-  function slotSuggestions(taxonomy) {
+  function slotSuggestions(taxonomy, keep) {
     if (!taxonomy || typeof marketSource !== "function") return "";
     const L = slotLists[taxonomy];
     if (!L) {
@@ -3541,8 +3585,9 @@ const Me = (() => {
       return `<div class="me-msg">Loading…</div>`;
     }
     if (L.items === null) return `<div class="me-msg">Loading…</div>`;
-    if (!L.items.length) return "";
-    return `<div class="me-h" style="margin-top:34px">You May Also Like</div><div class="me-grid">${itemCards(L.items)}</div>`;
+    const shown = keep ? L.items.filter(keep) : L.items;
+    if (!shown.length) return "";
+    return `<div class="me-h" style="margin-top:34px">You May Also Like</div><div class="me-grid">${itemCards(shown)}</div>`;
   }
 
   function searchPage() {
@@ -3709,6 +3754,10 @@ const Me = (() => {
     else if (a === "sub") { sub = sub === v ? null : v; }
     else if (a === "shelf") { shelf = v; }
     else if (a === "slot") { picked[shelf] = v; }
+    else if (a === "bpopen") { bodyPartDraft = bodyPart; bodyPartSheet = true; }
+    else if (a === "bppick") { bodyPartDraft = v; }
+    else if (a === "bpapply") { bodyPart = bodyPartDraft; bodyPartSheet = false; }
+    else if (a === "bpclose") { bodyPartSheet = false; }
     else if (a === "undo") { if (Store.undo(st)) { save(); previewWorn(st); } }
     else if (a === "redo") { if (Store.redo(st)) { save(); previewWorn(st); } }
     render();
