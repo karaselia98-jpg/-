@@ -16,6 +16,18 @@
 :root { --bg:#121215; --tile:#282930; --field:#282930; --ink:#f7f7f8; --faint:#d5d7dd; --dim:#bcbec8; --blue:#335fff; --verified:#0066ff; --online:#39c582; --pill:#161619; color-scheme:dark; }
 * { box-sizing:border-box; }
 html, body { height:100%; margin:0; }
+/* Native feel: no text selection, no long-press menu, no tap flash, no bounce, no double-tap zoom, no image dragging.
+   Text fields keep their own behaviour. */
+html, body, #app, #app * {
+  -webkit-user-select:none; user-select:none;
+  -webkit-touch-callout:none;
+  -webkit-tap-highlight-color:transparent;
+  -webkit-user-drag:none;
+}
+input, textarea, [contenteditable="true"] { -webkit-user-select:text; user-select:text; -webkit-touch-callout:default; }
+html, body { overscroll-behavior:none; touch-action:manipulation; }
+img { -webkit-user-drag:none; pointer-events:none; }
+:focus:not(:focus-visible) { outline:none; }
 body { background:#0b0b0d; font-family:BuilderSans, system-ui, sans-serif; color:var(--ink); display:flex; justify-content:center; }
 button, input, textarea { font:inherit; color:inherit; }
 button { cursor:pointer; background:none; border:0; padding:0; }
@@ -5505,4 +5517,12 @@ const AvatarStage = (() => {
 </body>
 </html>
 
+<script>
+// Native feel: no context menu on long press (except in text fields), no pinch zoom, no selection drag
+document.addEventListener("contextmenu", e => { if (!e.target.closest("input, textarea, [contenteditable='true']")) e.preventDefault(); });
+document.addEventListener("selectstart", e => { if (!e.target.closest || !e.target.closest("input, textarea, [contenteditable='true']")) e.preventDefault(); });
+document.addEventListener("dragstart", e => e.preventDefault());
+document.addEventListener("gesturestart", e => e.preventDefault());
+document.addEventListener("dblclick", e => e.preventDefault(), { passive: false });
+</script>
 </body></html>
