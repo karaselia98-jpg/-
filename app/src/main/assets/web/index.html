@@ -4415,6 +4415,16 @@ const LedgerEditor = (() => {
 })();
 
 
+// Roblox.people (Swift): every user the keyword finds, with headshots. Needs 3+ letters.
+async function robloxPeopleSearch(keyword) {
+  const data = await httpGet("https://users.roblox.com/v1/users/search?keyword=" + encodeURIComponent(keyword) + "&limit=10");
+  const users = Parse.users(data);
+  if (!users.length) return [];
+  const faces = await httpGet("https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=" + users.map(u => u.id).join(",") + "&size=150x150&format=Png")
+    .then(Parse.images, () => ({})).catch(() => ({}));
+  return users.map(u => ({ id: u.id, name: u.name, displayName: u.displayName, headshot: faces[u.id] || null }));
+}
+
 // ---- Send Robux: port of App/Robux/SendRobuxSheet.swift ----
 // Friends search, amount (presets, grouping as you type), review, Send or Edit.
 // The "People" search and the joined year come from Roblox, so they wait for the connection.
@@ -4423,6 +4433,9 @@ const SendRobuxSheet = (() => {
   let to = null;          // the friend picked, or null for the list
   let amount = "25";
   let reviewing = false;
+  let anyone = [];        // Roblox users the search finds (Swift `anyone`)
+  let anyoneTimer = null;
+  let anyoneSeq = 0;
 
   const friends = () => st.profile.friendList;
   const amountValue = () => Format.number(amount);
@@ -4450,13 +4463,17 @@ const SendRobuxSheet = (() => {
       ? `<div style="font-size:15.9px;font-weight:700;margin-top:4px">My friends (${escapeHtml(Format.grouped(total))})</div>` : "";
     const rows = shown.map(f => `<button data-a="spick" data-id="${f.id}" style="display:flex;align-items:center;gap:15px;width:100%;text-align:left">
       ${avatar(f, 48)}<span style="font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(f.displayName)}</span></button>`).join("");
+    const others = search.trim().length >= 3 ? anyone.filter(a => !shown.some(x => x.id === a.id)) : [];
+    const peopleHead = others.length ? `<div style="font-size:15.9px;font-weight:700;margin-top:${shown.length ? 8 : 4}px">People</div>` : "";
+    const peopleRows = others.map(f => `<button data-a="spick" data-id="${f.id}" style="display:flex;align-items:center;gap:15px;width:100%;text-align:left">
+      ${avatar(f, 48)}<span style="font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(f.displayName)}</span></button>`).join("");
     return `
       <div style="display:flex;align-items:center;gap:10px;height:39px;margin-top:16px;padding:0 14px;border:1px solid var(--tile);border-radius:20px">
         <span class="ic" style="font-size:20px">magnifying-glass</span>
         <input placeholder="Search" value="${escapeHtml(search)}" autocomplete="off" autocapitalize="none"
           oninput="SendRobuxSheet.setSearch(this.value)" style="flex:1;min-width:0;background:none;border:0;outline:0;color:var(--ink);font:inherit;font-size:13.7px">
       </div>
-      <div style="flex:1;overflow-y:auto;padding:16px 0 24px;display:flex;flex-direction:column;gap:20px">${head}${rows}</div>`;
+      <div style="flex:1;overflow-y:auto;padding:16px 0 24px;display:flex;flex-direction:column;gap:20px">${head}${rows}${peopleHead}${peopleRows}</div>`;
   }
 
   function amountPage(f) {
@@ -4510,11 +4527,28 @@ const SendRobuxSheet = (() => {
     else body.innerHTML = header() + (reviewing ? reviewPage(to) : amountPage(to));
   }
 
-  function open() { search = ""; to = null; amount = "25"; reviewing = false; $("s-send").hidden = false; render(); }
+  function open() { search = ""; anyone = []; to = null; amount = "25"; reviewing = false; $("s-send").hidden = false; render(); }
   function close() { $("s-send").hidden = true; save(); renderMenu(); }
-  function setSearch(v) { search = v; const body = $("sendBody"); if (body && to === null) { render(); const i = body.querySelector("input"); if (i) { i.focus(); i.setSelectionRange(v.length, v.length); } } }
+  function setSearch(v) {
+    search = v;
+    const body = $("sendBody");
+    if (body && to === null) { render(); const i = body.querySelector("input"); if (i) { i.focus(); i.setSelectionRange(v.length, v.length); } }
+    // Roblox search waits 450 ms after typing and needs 3 letters (Swift .task(id: search))
+    clearTimeout(anyoneTimer);
+    const q = v.trim();
+    if (q.length < 3) { anyone = []; return; }
+    const seq = ++anyoneSeq;
+    anyoneTimer = setTimeout(async () => {
+      const found = await robloxPeopleSearch(q).catch(() => []);
+      if (seq !== anyoneSeq || to !== null) return;
+      anyone = found;
+      render();
+      const i = $("sendBody") && $("sendBody").querySelector("input");
+      if (i) { i.focus(); i.setSelectionRange(search.length, search.length); }
+    }, 450);
+  }
   function pick(id) {
-    to = friends().find(f => String(f.id) === String(id)) || null;
+    to = friends().find(f => String(f.id) === String(id)) || anyone.find(f => String(f.id) === String(id)) || null;
     amount = "25";
     reviewing = false;
     render();
