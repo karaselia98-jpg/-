@@ -798,7 +798,7 @@ textarea.field { padding:8px; min-height:106px; resize:none; line-height:1.3; }
   <div class="sheetfull" id="s-friend" hidden style="background:linear-gradient(#29282c 0%,#4d5764 45%,#121215 100%);border-radius:16px 16px 0 0;top:auto;height:82%">
     <div style="height:22px;display:flex;align-items:center;justify-content:center"><span style="width:39px;height:4px;border-radius:2px;background:#3a3b42;display:block"></span></div>
     <div class="scroll"><div style="padding:0 24px 30px">
-      <div style="height:236px"></div>
+      <div style="height:236px;display:flex;align-items:center;justify-content:center"><img id="fPic" alt="" style="max-width:100%;max-height:236px;object-fit:contain" hidden></div>
       <div style="display:flex;align-items:center;gap:12px;margin-top:6px">
         <span class="fav88" id="fAv"></span>
         <div style="min-width:0"><div class="fname" id="fDisplay"></div><div class="fuser" id="fUser"></div></div>
@@ -2012,13 +2012,17 @@ const Friends = (() => {
     $("fSheetNote").textContent = "";
     $("fTrustBtn").textContent = "Add trusted friend";
     // the picture, bio and counts saved when the friend was added (FriendSheet.swift shows the same)
+    // round picture: the same headshot as on Home (Swift FriendSheet: RemoteCircle(url: face))
     const av = $("fAv");
-    av.style.backgroundImage = (f.picture || f.headshot) ? `url("${f.picture || f.headshot}")` : "";
+    av.style.backgroundImage = f.headshot ? `url("${f.headshot}")` : "";
     av.style.backgroundSize = "cover";
     av.style.backgroundPosition = "center";
+    // big picture on top: the full avatar (Swift: them.picture, fit in 236 pt)
+    const big = $("fPic");
+    if (f.picture) { big.src = f.picture; big.hidden = false; } else { big.removeAttribute("src"); big.hidden = true; }
     renderFriendExtras(f);
-    if (f.picture === undefined && window.SalBloxNative) {
-      robloxFriendDetails(f.id).then(d => {
+    if (f.picture === undefined && (window.SalBloxNative || SERVER_URL)) {
+      robloxFriendDetails(f.id, f.name).then(d => {
         const cur = st.profile.friendList.find(x => x.id === f.id);
         if (!cur) return;
         Object.assign(cur, d); save();
@@ -4847,7 +4851,11 @@ async function copyAvatarFrom(name) {
 const countOf = t => { try { return JSON.parse(t).count ?? null; } catch (e) { return null; } };
 // Add a real Roblox user to the friends list (Store.addFriend and Roblox.person in Swift). Saved on the phone only.
 // Roblox.someone in Swift: the full avatar picture, what they are wearing, and their favorite games
-async function robloxFriendDetails(id) {
+async function robloxFriendDetails(id, name) {
+  // the avatar picture comes from our avatar server (same as your own look), Roblox's thumbnail is the fallback
+  const look = SERVER_URL && name ? await fetch(SERVER_URL + "/look", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user: name }),
+  }).then(r => (r.ok ? r.json() : null)).catch(() => null) : null;
   const [pic, worn, favs] = await Promise.all([
     httpGet("https://thumbnails.roblox.com/v1/users/avatar?" + new URLSearchParams({ userIds: String(id), size: "720x720", format: "Png" })).then(Parse.images, () => ({})),
     httpGet("https://avatar.roblox.com/v2/avatar/users/" + id + "/avatar").then(Parse.worn, () => []),
@@ -4858,7 +4866,7 @@ async function robloxFriendDetails(id) {
   if (assets.length) Object.assign(shots, Parse.images(await httpGet("https://thumbnails.roblox.com/v1/assets?" + new URLSearchParams({ assetIds: assets.join(","), size: "150x150", format: "Png" })).catch(() => "{}")));
   const favorites = await robloxComplete(favs.slice(0, 10)).catch(() => favs.slice(0, 10));
   return {
-    picture: pic[id] || null,
+    picture: (look && look.image) || pic[id] || null,
     wearing: worn.map(i => ({ id: i.id, bundle: !!i.bundle, name: i.name, thumb: shots[i.id] || null })),
     favorites: favorites.map(g => ({ id: g.id, name: g.name, icon: g.icon || null })),
   };
@@ -4879,7 +4887,7 @@ async function robloxAddFriend(name) {
     bio: bio ? bio.bio : "",
     friends: friends ?? null, followers: followers ?? null, following: following ?? null,
   };
-  Object.assign(f, await robloxFriendDetails(user.id).catch(() => ({})));
+  Object.assign(f, await robloxFriendDetails(user.id, user.name).catch(() => ({})));
   const i = st.profile.friendList.findIndex(x => x.id === user.id);
   if (i >= 0) { st.profile.friendList[i] = { ...st.profile.friendList[i], ...f }; save(); return false; }
   st.profile.friendList.push(f);
