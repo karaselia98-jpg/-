@@ -34,7 +34,7 @@ button { cursor:pointer; background:none; border:0; padding:0; }
 button:active { transform:scale(.98); }
 .ic { font-family:BuilderIcons; font-size:24px; line-height:1; display:inline-block; user-select:none; }
 button.ic { color:var(--ink); background:none; border:0; padding:0; }
-#app { width:100%; max-width:430px; height:100vh; height:100dvh; background:var(--bg); position:relative; overflow:hidden; }
+#app { width:393px; height:100vh; height:100dvh; background:var(--bg); position:relative; overflow:hidden; transform-origin:top left; }
 .screen { position:absolute; inset:0; background:var(--bg); display:flex; flex-direction:column; }
 .screen[hidden] { display:none; }
 .scroll { flex:1; overflow-y:auto; }
@@ -6076,5 +6076,23 @@ document.addEventListener("selectstart", e => { if (!e.target.closest || !e.targ
 document.addEventListener("dragstart", e => e.preventDefault());
 document.addEventListener("gesturestart", e => e.preventDefault());
 document.addEventListener("dblclick", e => e.preventDefault(), { passive: false });
+</script>
+<script>
+// Lay the app out at the iPhone width Swift is designed for (393 pt) and scale it to this phone's width,
+// so sizes and spacing keep the same proportions as the Swift app on every Android screen.
+(function () {
+  const DESIGN_W = 393;
+  function fit() {
+    const app = document.getElementById("app");
+    if (!app) return;
+    const k = window.innerWidth / DESIGN_W;
+    app.style.zoom = k;
+    app.style.height = (window.innerHeight / k) + "px";
+  }
+  window.addEventListener("resize", fit);
+  window.addEventListener("orientationchange", fit);
+  document.addEventListener("DOMContentLoaded", fit);
+  fit();
+})();
 </script>
 </body></html>
