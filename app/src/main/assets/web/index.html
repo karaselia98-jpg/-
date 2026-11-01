@@ -5199,13 +5199,15 @@ async function copyAvatarFrom(name) {
   if (!r.ok || !look.definition) throw new Error(look.error || "The avatar service didn't answer.");
   const worn = Parse.worn(await httpGet("https://avatar.roblox.com/v2/avatar/users/" + user.id + "/avatar"));
   // every worn item becomes an owned item in Customize (bundles too), with its picture
+  // every item's details at the same time (one after another made copying very slow)
+  const details = await Promise.all(worn.map(w => w.bundle ? null
+    : httpGet("https://economy.roblox.com/v2/assets/" + w.id + "/details").catch(() => null)));
   const items = [];
-  for (const w of worn) {
-    if (w.bundle) { items.push({ ...makeItem({ id: w.id, bundle: true, name: w.name || "Bundle" }), wearing: true }); continue; }
-    const t = await httpGet("https://economy.roblox.com/v2/assets/" + w.id + "/details").catch(() => null);
-    const it = t ? Parse.asset(t) : null;
+  worn.forEach((w, n) => {
+    if (w.bundle) { items.push({ ...makeItem({ id: w.id, bundle: true, name: w.name || "Bundle" }), wearing: true }); return; }
+    const it = details[n] ? Parse.asset(details[n]) : null;
     if (it) { it.wearing = true; items.push(it); }
-  }
+  });
   const assetIds = items.filter(i => !i.bundle).map(i => i.id);
   const bundleIds = items.filter(i => i.bundle).map(i => i.id);
   const pics = {};
