@@ -3499,8 +3499,25 @@ const Me = (() => {
     else {
       const here = ownedIn(i => Catalog.shelfOf(i) === shelf && holdsSlot(slot, i));
       body = here.length ? `<div style="padding-top:30px">${ownedGrid(here)}</div>` : `<div class="me-empty" style="padding-top:30px">No ${plural(slot.name)}</div>`;
+      body += slotSuggestions(slot.taxonomy);
     }
     return `<div class="me-body">${slotRow()}<div style="padding-top:20px">${body}</div></div>`;
+  }
+
+  // Swift suggestionList: "You May Also Like" under the owned items of a slot, from the slot's catalog taxonomy
+  const slotLists = {};
+  function slotSuggestions(taxonomy) {
+    if (!taxonomy || typeof marketSource !== "function") return "";
+    const L = slotLists[taxonomy];
+    if (!L) {
+      slotLists[taxonomy] = { items: null };
+      marketSource("", null, taxonomy).then(list => { slotLists[taxonomy] = { items: list.slice(0, 12) }; render(); })
+        .catch(() => { slotLists[taxonomy] = { items: [] }; render(); });
+      return `<div class="me-msg">Loading…</div>`;
+    }
+    if (L.items === null) return `<div class="me-msg">Loading…</div>`;
+    if (!L.items.length) return "";
+    return `<div class="me-h" style="margin-top:34px">You May Also Like</div><div class="me-grid">${itemCards(L.items)}</div>`;
   }
 
   function searchPage() {
@@ -3618,7 +3635,15 @@ const Me = (() => {
     if (a === "clearsearch") { query = ""; marketItems = null; render(); return; }
     if (a === "moreitems") { loadMoreItems(); return; }
     if (a === "morecat") { loadMoreCat(); return; }
-    if (a === "openitem") { const it = (marketItems || []).find(x => String(x.id) === v); if (it) ItemPage.open(it); return; }
+    if (a === "openitem") {
+      // the item can be in the search list, a category list or a slot's "You May Also Like"
+      const pools = [marketItems || [], ...Object.values(catLists).map(L => L.items || []), ...Object.values(slotLists).map(L => L.items || [])];
+      let it = null;
+      for (const pool of pools) { it = pool.find(x => String(x.id) === v && !!x.bundle === (el.dataset.b === "1")) || it; if (it) break; }
+      if (!it) for (const pool of pools) { it = pool.find(x => String(x.id) === v) || null; if (it) break; }
+      if (it) ItemPage.open(it);
+      return;
+    }
     if (a === "outfitadd") { outfitDialog = { kind: "name" }; render(); return; }
     if (a === "owned") {
       const item = st.profile.items.find(i => String(i.id) === v && (!!i.bundle) === (el.dataset.b === "1"));
