@@ -3492,10 +3492,21 @@ const Me = (() => {
       }
       return;
     }
+    // the rebuild also puts the vertical scrolling back to the top, so remember it and restore it
+    const up = el.scrollTop;
+    const sheetOld = el.querySelector(".me-sheet");
+    const sheetUp = sheetOld ? sheetOld.scrollTop : 0;
+    const bodyOld = el.querySelector(".me-body");
+    const bodyUp = bodyOld ? bodyOld.scrollTop : 0;
     el.innerHTML = stage() + `<div class="me-sheet">${sheet}</div>` + dialogHtml();
     el.querySelectorAll("[data-sk]").forEach(row => {
       if (keep[row.dataset.sk] !== undefined) row.scrollLeft = keep[row.dataset.sk];
     });
+    el.scrollTop = up;
+    const sheetNew = el.querySelector(".me-sheet");
+    if (sheetNew) sheetNew.scrollTop = sheetUp;
+    const bodyNew = el.querySelector(".me-body");
+    if (bodyNew) bodyNew.scrollTop = bodyUp;
   }
 
   let marketMoreBusy = false;
