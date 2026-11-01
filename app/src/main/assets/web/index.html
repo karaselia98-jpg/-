@@ -3546,7 +3546,8 @@ const Me = (() => {
       // Roblox: "Body Parts" picker. Full Body = the full body packages; the other choices are single parts
       const pick = BODY_PARTS.find(b => b.name === bodyPart) || BODY_PARTS[0];
       const keep = i => pick.kinds === null ? !!i.bundle : (!i.bundle && pick.kinds.includes(i.kind));
-      const here = ownedIn(i => Catalog.shelfOf(i) === shelf && keep(i));
+      // full body packages are bundles, and they belong under Body > Full Body, not under Avatars
+      const here = ownedIn(i => keep(i));
       body = `<div class="bp-row"><span>Body Parts</span><button class="bp-pick" data-m-act="bpopen">${esc(pick.name)}<span class="ic">chevron-down</span></button></div>`;
       body += here.length ? `<div style="padding-top:20px">${ownedGrid(here)}</div>` : `<div class="me-empty" style="padding-top:30px">No ${esc(pick.name)}</div>`;
       body += slotSuggestions(slot.taxonomy, keep);
