@@ -5704,7 +5704,7 @@ const AvatarCore = (() => {
     const width = Math.max(hi[0] - lo[0], hi[2] - lo[2]);
     const center = [(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, (lo[2] + hi[2]) / 2];
     // zoom is our addition for the slot row (not in the iPhone code); 1 leaves the camera exactly as SceneKit sets it
-    const dist = ((Math.max(height, width) / 2 / Math.tan((15 * Math.PI) / 180)) * 1.1) / zoom;
+    const dist = ((Math.max(height, width) / 2 / Math.tan((15 * Math.PI) / 180)) * 0.9) / zoom;
     const eye = [0, 0, -dist];  // level camera: the 0.03 lift made the camera look down, which tilted the figure back
 
     // camera basis, same as SceneKit's look(at: origin)
@@ -5911,7 +5911,7 @@ const AvatarGL = (() => {
     gl.viewport(0, 0, W, H);
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-    const dist = (Math.max(g.height, g.width) / 2 / Math.tan((15 * Math.PI) / 180)) * 1.1;
+    const dist = (Math.max(g.height, g.width) / 2 / Math.tan((15 * Math.PI) / 180)) * 0.9;
     const c = g.center;
     const cs = Math.cos(angle), sn = Math.sin(angle);
     const lp = Math.cos(-LEAN), sp = Math.sin(-LEAN);
