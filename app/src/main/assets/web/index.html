@@ -5190,15 +5190,17 @@ const phraseIn = (name, phrase) => {
   const q = String(phrase || "").trim().replace(/\s+/g, " ").toLowerCase();
   return !q || String(name || "").toLowerCase().replace(/\s+/g, " ").includes(q);
 };
-async function catalogSearchSource(keyword, cursor, taxonomy) {
+async function catalogSearchSource(keyword, cursor, taxonomy, quoted = true) {
   const params = { limit: "30" };
-  if (keyword) { params.keyword = keyword; params.sortType = "1"; }
+  const phrase = String(keyword || "").trim().replace(/\s+/g, " ");
+  if (keyword) { params.keyword = quoted && phrase.includes(" ") ? '"' + phrase + '"' : phrase; params.sortType = "1"; }
   if (taxonomy) params.taxonomy = taxonomy;
   if (cursor) params.cursor = cursor;
   const text = await httpGet(robloxUrl("https://catalog.roblox.com/v2/search/items/details", params));
   const found = Parse.catalog(text);
   const next = Parse.catalogCursor(text);
   const items = keyword ? found.filter(i => phraseIn(i.name, keyword)) : found;
+  if (!items.length && keyword && quoted && !cursor && phrase.includes(" ")) return catalogSearchSource(keyword, cursor, taxonomy, false);
   if (!items.length) { const empty = []; empty.next = null; return empty; }
   const assets = items.filter(i => !i.bundle).map(i => i.id);
   const bundles = items.filter(i => i.bundle).map(i => i.id);
@@ -5445,16 +5447,19 @@ async function robloxComplete(games) {
 }
 
 // Roblox.games(query): the search box and the experiences search both use this
-async function robloxSearchGames(query) {
+async function robloxSearchGames(query, quoted = true) {
   try {
     const sid = crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random();
+    const phrase = String(query || "").trim().replace(/\s+/g, " ");
     const searchUrl = robloxUrl("https://apis.roblox.com/search-api/omni-search",
-      { searchQuery: query, sessionId: sid, pageType: "all" });
+      { searchQuery: quoted && phrase.includes(" ") ? '"' + phrase + '"' : phrase, sessionId: sid, pageType: "all" });
     // Roblox sometimes says "busy" for a moment: ask once more before giving up (Swift's try? does not retry, so this only helps)
     let data;
     try { data = await httpGet(searchUrl); }
     catch (e) { await new Promise(r => setTimeout(r, 1500)); data = await httpGet(searchUrl); }
-    return await robloxComplete(Parse.games(data).filter(g => phraseIn(g.name, query)).slice(0, 20));
+    const games = Parse.games(data).filter(g => phraseIn(g.name, query)).slice(0, 20);
+    if (!games.length && quoted && phrase.includes(" ")) return robloxSearchGames(query, false);
+    return await robloxComplete(games);
   } catch (e) { return robloxRequestFailed(e); }
 }
 searchSource = robloxSearchGames;
