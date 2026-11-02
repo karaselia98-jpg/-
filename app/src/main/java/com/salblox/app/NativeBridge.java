@@ -87,6 +87,11 @@ public class NativeBridge {
         c.setReadTimeout(20000);
         c.setRequestProperty("User-Agent", USER_AGENT);
         c.setRequestProperty("Accept", "application/json");
+        // like the Swift app's URLSession: the login cookie goes with every Roblox request, when there is one
+        String login = Session.cookie(ctx);
+        if (login != null && !login.isEmpty()) {
+            c.setRequestProperty("Cookie", ".ROBLOSECURITY=" + login);
+        }
         if (token != null) {
             c.setRequestProperty("x-csrf-token", token);
         }
