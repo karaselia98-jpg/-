@@ -32,6 +32,8 @@ body { background:#0b0b0d; font-family:BuilderSans, system-ui, sans-serif; color
 button, input, textarea { font:inherit; color:inherit; }
 button { cursor:pointer; background:none; border:0; padding:0; }
 button:active { transform:scale(.98); }
+.pullbar { position:absolute; top:100px; left:50%; margin-left:-17px; width:34px; height:34px; border-radius:50%; background:var(--tile); z-index:5; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(0,0,0,.25); }
+.pullbar::after { content:""; width:16px; height:16px; border:2px solid var(--ink); border-right-color:transparent; border-radius:50%; animation:spin .8s linear infinite; }
 .ic { font-family:BuilderIcons; font-size:24px; line-height:1; display:inline-block; user-select:none; white-space:nowrap; }
 button.ic, .htop .ic, .me-row1 .ic { color:var(--ink) !important; }
 button.ic { background:none; border:0; padding:0; }
@@ -771,6 +773,7 @@ textarea.field { padding:8px; min-height:106px; resize:none; line-height:1.3; }
       <button id="tabFor" class="on" data-a="htab" data-t="forYou"><span>For you</span><i></i></button>
       <button id="tabCharts" data-a="htab" data-t="charts"><span>Charts</span><i></i></button>
     </div>
+    <div class="pullbar" id="pullBar" hidden></div>
     <div class="scroll hpad" id="homeBody"></div>
     <div class="tabbar">
       <button data-a="tab" data-t="home"><span class="ic">house</span>Home</button>
@@ -4129,7 +4132,7 @@ function bindEdit() {
     $("f-copystatus").textContent = "Copying…";
     try {
       const n = await copyAvatarFrom(name);
-      $("f-copystatus").textContent = "Copied " + name + "'s avatar and " + n + " worn items.";
+      if (n >= 0) $("f-copystatus").textContent = "Copied " + name + "'s avatar and " + n + " worn items.";
       if (typeof Me !== "undefined" && Me.render) Me.render();
       if (typeof Home !== "undefined" && Home.render) Home.render();
       if (typeof renderMenu === "function") renderMenu();
@@ -4188,17 +4191,26 @@ function bindEdit() {
     const v = Format.cleanUsername(e.target.value); e.target.value = v; p().username = v; save();
     clearTimeout(accountCopyTimer);
     if (v.length < 3 || v === accountCopied || !SERVER_URL) return;
-    accountCopyTimer = setTimeout(() => {
-      accountCopied = v;
-      copyAvatarFrom(v).then(() => {
-        $("f-user").value = st.profile.username;
-        $("f-name").value = st.profile.displayName;
-        if (typeof Me !== "undefined" && Me.render) Me.render();
-        if (typeof Home !== "undefined" && Home.render) Home.render();
-        if (typeof renderMenu === "function") renderMenu();
-      }).catch(() => {});
-    }, 900);
+    // wait until the typing stops, so partial names are never copied
+    accountCopyTimer = setTimeout(() => copyFromAccount(v), 1500);
   });
+  async function copyFromAccount(v) {
+    accountCopied = v;
+    $("f-copystatus").textContent = "Copying…";
+    try {
+      const n = await copyAvatarFrom(v);
+      if (n < 0) return;
+      $("f-user").value = st.profile.username;
+      $("f-name").value = st.profile.displayName;
+      $("f-copystatus").textContent = "Copied " + st.profile.username + "'s avatar and " + n + " worn items.";
+      if (typeof Me !== "undefined" && Me.render) Me.render();
+      if (typeof Home !== "undefined" && Home.render) Home.render();
+      if (typeof renderMenu === "function") renderMenu();
+    } catch (e) {
+      accountCopied = null;
+      $("f-copystatus").textContent = String(e && e.message || e);
+    }
+  }
   $("f-name").addEventListener("input", e => { p().displayName = e.target.value.slice(0, 20); save(); });
   $("f-robux").addEventListener("input", e => { const n = Format.number(e.target.value); p().robux = n; e.target.value = n === 0 ? "" : String(n); save(); renderMenu(); });
   $("f-friends").addEventListener("input", e => { const n = Format.number(e.target.value); p().friends = n; e.target.value = n === 0 ? "" : String(n); save(); });
@@ -5306,8 +5318,11 @@ async function applyLookBody(body) {
     await AvatarStage.setModel({ obj, mtl, textures: files, bodyColors: (body.definition || {}).bodyColors });
   }
 }
+let copySeq = 0;
+// returns the number of worn items copied, or -1 when a newer copy has replaced this one
 async function copyAvatarFrom(name) {
   if (!SERVER_URL) throw new Error("No avatar server connected yet.");
+  const seq = ++copySeq;
   const user = Parse.user(await robloxPost("https://users.roblox.com/v1/usernames/users", { usernames: [name], excludeBannedUsers: true }));
   if (!user) throw new Error("No Roblox user with that name.");
   const r = await fetch(SERVER_URL + "/look", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user: name }) });
@@ -5334,6 +5349,7 @@ async function copyAvatarFrom(name) {
   if (assetIds.length) Object.assign(pics, Parse.images(await httpGet(robloxUrl("https://thumbnails.roblox.com/v1/assets", { assetIds: assetIds.join(","), size: "420x420", format: "Png" })).catch(() => "{}")));
   if (bundleIds.length) Object.assign(pics, Parse.images(await httpGet(robloxUrl("https://thumbnails.roblox.com/v1/bundles/thumbnails", { bundleIds: bundleIds.join(","), size: "420x420", format: "Png" })).catch(() => "{}")));
   for (const i of items) i.thumb = pics[i.id] || null;
+  if (seq !== copySeq) return -1;
   Profile.adopt(st.profile, items);
   prepareOwned(items, look.definition);
   st.profile.definition = look.definition;
@@ -5365,6 +5381,7 @@ async function copyAvatarFrom(name) {
         bio: "", friends: null, followers: null, following: null });
     }
   }
+  if (seq !== copySeq) return -1;
   loadedFor = null;
   await applyLookBody(look);
   save();
@@ -5533,6 +5550,29 @@ async function robloxSearchGames(query, quoted = true) {
 searchSource = robloxSearchGames;
 
 Home.load(pickHomeSource());
+// pull down on Home to refresh the rows, the friends and your avatar (like the usual apps)
+(() => {
+  const body = $("homeBody"), bar = $("pullBar");
+  let y0 = null, pulled = 0, busy = false;
+  body.addEventListener("touchstart", e => { y0 = !busy && body.scrollTop <= 0 ? e.touches[0].clientY : null; pulled = 0; }, { passive: true });
+  body.addEventListener("touchmove", e => {
+    if (y0 === null) return;
+    pulled = e.touches[0].clientY - y0;
+    if (pulled > 0 && body.scrollTop <= 0) { bar.hidden = false; bar.style.transform = `translateY(${Math.min(pulled, 90) * 0.5}px)`; }
+  }, { passive: true });
+  body.addEventListener("touchend", async () => {
+    const go = y0 !== null && pulled > 80 && !busy;
+    y0 = null;
+    if (!go) { bar.hidden = true; bar.style.transform = ""; return; }
+    busy = true; bar.hidden = false;
+    try {
+      loadedFor = null;
+      await Promise.all([Home.load(pickHomeSource()), loadMyAvatar()]);
+      renderMenu();
+    } catch (e) {}
+    busy = false; bar.hidden = true; bar.style.transform = "";
+  });
+})();
 
 
 // ---- Adjust profile picture (port of App/Profile/CropView.swift) ----
