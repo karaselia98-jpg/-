@@ -4985,6 +4985,19 @@ function prepareOwned(items, base) {
     body: JSON.stringify({ base: base || st.profile.definition || lookBase, items: list }) }).catch(() => {});
 }
 
+// Draw ahead the outfits with one piece taken off, so taking a piece off is as quick as putting it on.
+// Only for outfits without bundles (the server draws bundles as Roblox lists them, which is not known here).
+function prepareRemovals(st, base) {
+  if (!SERVER_URL || !base) return;
+  const worn = st.profile.items
+    .filter(i => { const o = Profile.owns(st.profile, i); return !!(o && o.wearing); })
+    .map(i => ({ id: i.id, bundle: !!i.bundle, kind: i.kind ?? null }));
+  if (!worn.length || worn.some(w => w.bundle)) return;
+  const combos = worn.map((_, n) => worn.filter((_, j) => j !== n));
+  fetch(SERVER_URL + "/prepare", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ base, combos }) }).catch(() => {});
+}
+
 function previewWorn(st) {
   clearTimeout(previewTimer);
   // short wait so several taps become one redraw, but the change starts at once
@@ -5064,6 +5077,7 @@ async function previewWornNow(st, tries) {
     try { save(); } catch (e) {}
     drew = true;
     showDrawNote("");
+    prepareRemovals(st, base);
   } catch (e) {
     console.log("[avatar] preview failed:", e && e.message);
     // busy or offline: try again soon at first, then later (Swift: 6 s, 6 s, 60 s, 60 s)
