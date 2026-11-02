@@ -6047,6 +6047,8 @@ const AvatarStage = (() => {
   }
 
   function paint(canvas, m, tx) {
+    // a hidden screen has no size yet: leave it, and paint when it shows (see watch)
+    if (!canvas.clientWidth || !canvas.clientHeight) return;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const w = Math.max(1, Math.round(canvas.clientWidth * dpr));
     const h = Math.max(1, Math.round(canvas.clientHeight * dpr));
@@ -6143,7 +6145,7 @@ const AvatarStage = (() => {
     new MutationObserver(() => {
       if (!model) return;
       refreshSoon();
-    }).observe(app, { childList: true, subtree: true });
+    }).observe(app, { childList: true, subtree: true, attributes: true, attributeFilter: ["hidden", "class", "style"] });
   }
   window.addEventListener("load", watch);
 
