@@ -2910,9 +2910,28 @@ const ProfilePage = (() => {
   return { open, close, openFull, closeFull, setTab, toggleBio, openGame, renderSummary, renderFull };
 })();
 
+// The item's details from Roblox, as Roblox.itemDetails, bigThumb and recommended do in Swift.
+// The POST goes through the Android bridge, which handles the CSRF token.
+async function itemSource(item) {
+  if (!item) return { detail: null, also: [] };
+  const text = await robloxPost("https://catalog.roblox.com/v1/catalog/items/details", { items: [{ itemType: item.bundle ? "Bundle" : "Asset", id: item.id }] });
+  const detail = Parse.itemDetails(text)[0] || null;
+  let also = [];
+  try {
+    const recUrl = item.bundle
+      ? robloxUrl("https://catalog.roblox.com/v2/recommendations/bundles", { bundleTypeId: String((detail && detail.bundleType) || 1), contextBundleId: String(item.id), numItems: "12" })
+      : robloxUrl("https://catalog.roblox.com/v2/recommendations/assets", { assetTypeId: String(item.kind || 8), contextAssetId: String(item.id), numItems: "12" });
+    const ids = Parse.recommendations(await httpGet(recUrl)).filter(x => String(x) !== String(item.id)).slice(0, 12);
+    if (ids.length) {
+      const found = Parse.itemDetails(await robloxPost("https://catalog.roblox.com/v1/catalog/items/details", { items: ids.map(x => ({ itemType: "Asset", id: x })) })).map(x => x.item);
+      const pics = Parse.images(await httpGet(robloxUrl("https://thumbnails.roblox.com/v1/assets", { assetIds: ids.join(","), size: "420x420", format: "Png" })).catch(() => "{}"));
+      also = found.map(f => ({ ...f, thumb: pics[f.id] || null }));
+    }
+  } catch (e) { also = []; }
+  return { detail, also };
+}
+
 // Item page: port of Item/ItemPage.swift (owned items), and the buy popups from Item/Buying.swift.
-// Not ported yet: the item details from Roblox (description, parts, favorites, recommendations).
-// Those need a POST with a CSRF token, which the web page cannot send yet.
 const ItemPage = (() => {
   let shown = null;
   let moreOpen = false;
@@ -2935,10 +2954,7 @@ const ItemPage = (() => {
   function open(item) { shown = item; moreOpen = false; detail = null; detailLoaded = false; wholeText = false; also = []; render(); $("s-item").hidden = false; loadDetail(); }
   async function loadDetail() {
     const id = shown && shown.id;
-    const src = typeof itemSource === "function" ? itemSource : null;
-    if (src) {
-      try { const d = await src(id); if (shown && shown.id === id) { detail = d.detail || null; also = d.also || []; } } catch (e) { detail = null; }
-    }
+    try { const d = await itemSource(shown); if (shown && shown.id === id) { detail = d.detail || null; also = d.also || []; } } catch (e) { detail = null; }
     if (shown && shown.id === id) { detailLoaded = true; renderExtra(); }
   }
   function renderExtra() {
