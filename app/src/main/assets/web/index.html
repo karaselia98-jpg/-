@@ -5185,14 +5185,20 @@ const TAXONOMY = {
     Looks: "dBM565GC3YYTdi9UKvr87Z", Eyes: "1e7vNivWk2To6BdYJt5RGF", Lips: "c3PEmGVddwsc6bKqtuR7rC", Eyelashes: "4zqsNnG4Tp7xZThAEpv2dN", Eyebrows: "1cMbsG373EMD4ncRqGhtyZ",
   },
 };
+// the whole phrase the person typed must be in the name, not just one of its words
+const phraseIn = (name, phrase) => {
+  const q = String(phrase || "").trim().replace(/\s+/g, " ").toLowerCase();
+  return !q || String(name || "").toLowerCase().replace(/\s+/g, " ").includes(q);
+};
 async function catalogSearchSource(keyword, cursor, taxonomy) {
   const params = { limit: "30" };
   if (keyword) { params.keyword = keyword; params.sortType = "1"; }
   if (taxonomy) params.taxonomy = taxonomy;
   if (cursor) params.cursor = cursor;
   const text = await httpGet(robloxUrl("https://catalog.roblox.com/v2/search/items/details", params));
-  const items = Parse.catalog(text);
+  const found = Parse.catalog(text);
   const next = Parse.catalogCursor(text);
+  const items = keyword ? found.filter(i => phraseIn(i.name, keyword)) : found;
   if (!items.length) { const empty = []; empty.next = null; return empty; }
   const assets = items.filter(i => !i.bundle).map(i => i.id);
   const bundles = items.filter(i => i.bundle).map(i => i.id);
@@ -5448,7 +5454,7 @@ async function robloxSearchGames(query) {
     let data;
     try { data = await httpGet(searchUrl); }
     catch (e) { await new Promise(r => setTimeout(r, 1500)); data = await httpGet(searchUrl); }
-    return await robloxComplete(Parse.games(data).slice(0, 20));
+    return await robloxComplete(Parse.games(data).filter(g => phraseIn(g.name, query)).slice(0, 20));
   } catch (e) { return robloxRequestFailed(e); }
 }
 searchSource = robloxSearchGames;
