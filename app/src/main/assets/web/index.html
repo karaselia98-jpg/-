@@ -4131,7 +4131,7 @@ function bindEdit() {
     $("f-copy").disabled = true;
     $("f-copystatus").textContent = "Copying…";
     try {
-      const n = await copyAvatarFrom(name);
+      const n = await copyAvatarFrom(name, false);
       if (n >= 0) $("f-copystatus").textContent = "Copied " + name + "'s avatar and " + n + " worn items.";
       if (typeof Me !== "undefined" && Me.render) Me.render();
       if (typeof Home !== "undefined" && Home.render) Home.render();
@@ -5253,31 +5253,21 @@ async function catalogSearchSource(keyword, cursor, taxonomy, quoted = true) {
     const text = await httpGet(robloxUrl("https://catalog.roblox.com/v2/search/items/details", params));
     return { found: Parse.catalog(text), next: Parse.catalogCursor(text) };
   };
-  // collect matching items over a few pages, so the list is full and not only the first 30 hits
-  const collect = async (kw, quote) => {
+  // Roblox's own search: every item it returns is shown; the ones whose name has the whole phrase come first
+  const collect = async (kw) => {
     const got = [];
     let cur = cursor, next = null;
     for (let page = 0; page < 4; page++) {
-      const r = await fetchPage(kw, cur, quote);
-      const ok = kw ? r.found.filter(i => phraseIn(i.name, kw)) : r.found;
-      for (const i of ok) if (!got.some(g => g.id === i.id)) got.push(i);
+      const r = await fetchPage(kw, cur, false);
+      for (const i of r.found) if (!got.some(g => g.id === i.id)) got.push(i);
       next = r.next;
       if (!next || got.length >= 30) break;
       cur = next;
     }
+    if (kw) got.sort((a, b) => (phraseIn(b.name, kw) ? 1 : 0) - (phraseIn(a.name, kw) ? 1 : 0));
     return { items: got, next };
   };
-  let result;
-  try {
-    result = await collect(keyword ? phrase : keyword, quoted);
-  } catch (e) {
-    // the quoted request failed on Roblox's side: try the plain words once before giving up
-    if (!keyword || !quoted) throw e;
-    result = await collect(phrase, false);
-  }
-  if (!result.items.length && keyword && quoted && !cursor && phrase.includes(" ")) {
-    result = await collect(phrase, false);
-  }
+  const result = await collect(keyword ? phrase : keyword);
   const items = result.items;
   const next = result.next;
   if (!items.length) { const empty = []; empty.next = null; return empty; }
@@ -5320,7 +5310,7 @@ async function applyLookBody(body) {
 }
 let copySeq = 0;
 // returns the number of worn items copied, or -1 when a newer copy has replaced this one
-async function copyAvatarFrom(name) {
+async function copyAvatarFrom(name, full = true) {
   if (!SERVER_URL) throw new Error("No avatar server connected yet.");
   const seq = ++copySeq;
   const user = Parse.user(await robloxPost("https://users.roblox.com/v1/usernames/users", { usernames: [name], excludeBannedUsers: true }));
@@ -5340,8 +5330,9 @@ async function copyAvatarFrom(name) {
   const items = [];
   worn.forEach((w, n) => {
     if (w.bundle) { items.push({ ...makeItem({ id: w.id, bundle: true, name: w.name || "Bundle" }), wearing: true }); return; }
+    // when Roblox's details are missing, keep the item from the avatar list (its type is still there), so it is owned too
     const it = details[n] ? Parse.asset(details[n]) : null;
-    if (it) { it.wearing = true; items.push(it); }
+    items.push({ ...(it || { ...w, creator: "", price: null }), bundle: false, wearing: true });
   });
   const assetIds = items.filter(i => !i.bundle).map(i => i.id);
   const bundleIds = items.filter(i => i.bundle).map(i => i.id);
@@ -5355,10 +5346,19 @@ async function copyAvatarFrom(name) {
   st.profile.definition = look.definition;
   lookBase = look.definition;
   // the username typed here becomes this profile's own name, and its avatar is the one shown
-  st.profile.username = user.name;
-  st.profile.displayName = user.displayName || user.name;
-  st.profile.verified = !!user.verified;
+  if (full) {
+    st.profile.username = user.name;
+    st.profile.displayName = user.displayName || user.name;
+    st.profile.verified = !!user.verified;
+  }
   // the profile's numbers, bio and friends come from the same Roblox user
+  if (!full) {
+    if (seq !== copySeq) return -1;
+    loadedFor = null;
+    await applyLookBody(look);
+    save();
+    return items.length;
+  }
   const uid = user.id;
   const [who, fr, fo, fg, friendsRes] = await Promise.all([
     httpGet("https://users.roblox.com/v1/users/" + uid).then(Parse.person, () => null).catch(() => null),
