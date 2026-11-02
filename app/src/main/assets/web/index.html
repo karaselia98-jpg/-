@@ -5225,16 +5225,43 @@ const phraseIn = (name, phrase) => {
   return !q || String(name || "").toLowerCase().replace(/\s+/g, " ").includes(q);
 };
 async function catalogSearchSource(keyword, cursor, taxonomy, quoted = true) {
-  const params = { limit: "30" };
+  // one search request for a phrase: returns the matching items (the phrase is checked on each name)
   const phrase = String(keyword || "").trim().replace(/\s+/g, " ");
-  if (keyword) { params.keyword = quoted && phrase.includes(" ") ? '"' + phrase + '"' : phrase; params.sortType = "1"; }
-  if (taxonomy) params.taxonomy = taxonomy;
-  if (cursor) params.cursor = cursor;
-  const text = await httpGet(robloxUrl("https://catalog.roblox.com/v2/search/items/details", params));
-  const found = Parse.catalog(text);
-  const next = Parse.catalogCursor(text);
-  const items = keyword ? found.filter(i => phraseIn(i.name, keyword)) : found;
-  if (!items.length && keyword && quoted && !cursor && phrase.includes(" ")) return catalogSearchSource(keyword, cursor, taxonomy, false);
+  const fetchPage = async (kw, cur, quote) => {
+    const params = { limit: "30" };
+    if (kw) { params.keyword = quote && kw.includes(" ") ? '"' + kw + '"' : kw; params.sortType = "1"; }
+    if (taxonomy) params.taxonomy = taxonomy;
+    if (cur) params.cursor = cur;
+    const text = await httpGet(robloxUrl("https://catalog.roblox.com/v2/search/items/details", params));
+    return { found: Parse.catalog(text), next: Parse.catalogCursor(text) };
+  };
+  // collect matching items over a few pages, so the list is full and not only the first 30 hits
+  const collect = async (kw, quote) => {
+    const got = [];
+    let cur = cursor, next = null;
+    for (let page = 0; page < 4; page++) {
+      const r = await fetchPage(kw, cur, quote);
+      const ok = kw ? r.found.filter(i => phraseIn(i.name, kw)) : r.found;
+      for (const i of ok) if (!got.some(g => g.id === i.id)) got.push(i);
+      next = r.next;
+      if (!next || got.length >= 30) break;
+      cur = next;
+    }
+    return { items: got, next };
+  };
+  let result;
+  try {
+    result = await collect(keyword ? phrase : keyword, quoted);
+  } catch (e) {
+    // the quoted request failed on Roblox's side: try the plain words once before giving up
+    if (!keyword || !quoted) throw e;
+    result = await collect(phrase, false);
+  }
+  if (!result.items.length && keyword && quoted && !cursor && phrase.includes(" ")) {
+    result = await collect(phrase, false);
+  }
+  const items = result.items;
+  const next = result.next;
   if (!items.length) { const empty = []; empty.next = null; return empty; }
   const assets = items.filter(i => !i.bundle).map(i => i.id);
   const bundles = items.filter(i => i.bundle).map(i => i.id);
