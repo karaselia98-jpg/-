@@ -4520,6 +4520,16 @@ const SendRobuxSheet = (() => {
   }
 
   function list() {
+    return `
+      <div style="display:flex;align-items:center;gap:10px;height:39px;margin-top:16px;padding:0 14px;border:1px solid var(--tile);border-radius:20px">
+        <span class="ic" style="font-size:20px;color:var(--ink)">magnifying-glass</span>
+        <input placeholder="Search" value="${escapeHtml(search)}" autocomplete="off" autocapitalize="none"
+          oninput="SendRobuxSheet.setSearch(this.value)" style="flex:1;min-width:0;background:none;border:0;outline:0;color:var(--ink);font:inherit;font-size:13.7px">
+      </div>
+      <div id="sendList" style="flex:1;overflow-y:auto;padding:16px 0 24px;display:flex;flex-direction:column;gap:20px">${listRows()}</div>`;
+  }
+  // only the results are redrawn while typing, so the search box keeps its focus and cursor
+  function listRows() {
     const shown = shownFriends();
     const total = search === "" ? friends().length : shown.length;
     const head = (shown.length > 0 || search === "")
@@ -4530,13 +4540,7 @@ const SendRobuxSheet = (() => {
     const peopleHead = others.length ? `<div style="font-size:15.9px;font-weight:700;margin-top:${shown.length ? 8 : 4}px">People</div>` : "";
     const peopleRows = others.map(f => `<button data-a="spick" data-id="${f.id}" style="display:flex;align-items:center;gap:15px;width:100%;text-align:left">
       ${avatar(f, 48)}<span style="font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(f.displayName)}</span></button>`).join("");
-    return `
-      <div style="display:flex;align-items:center;gap:10px;height:39px;margin-top:16px;padding:0 14px;border:1px solid var(--tile);border-radius:20px">
-        <span class="ic" style="font-size:20px;color:var(--ink)">magnifying-glass</span>
-        <input placeholder="Search" value="${escapeHtml(search)}" autocomplete="off" autocapitalize="none"
-          oninput="SendRobuxSheet.setSearch(this.value)" style="flex:1;min-width:0;background:none;border:0;outline:0;color:var(--ink);font:inherit;font-size:13.7px">
-      </div>
-      <div style="flex:1;overflow-y:auto;padding:16px 0 24px;display:flex;flex-direction:column;gap:20px">${head}${rows}${peopleHead}${peopleRows}</div>`;
+    return `${head}${rows}${peopleHead}${peopleRows}`;
   }
 
   function amountPage(f) {
@@ -4592,10 +4596,14 @@ const SendRobuxSheet = (() => {
 
   function open() { search = ""; anyone = []; to = null; amount = "25"; reviewing = false; $("s-send").hidden = false; render(); }
   function close() { $("s-send").hidden = true; save(); renderMenu(); }
+  function redrawList() {
+    const l = $("sendList");
+    if (l) l.innerHTML = listRows();
+  }
   function setSearch(v) {
     search = v;
     const body = $("sendBody");
-    if (body && to === null) { render(); const i = body.querySelector("input"); if (i) { i.focus(); i.setSelectionRange(v.length, v.length); } }
+    if (body && to === null) redrawList();
     // Roblox search waits 450 ms after typing and needs 3 letters (Swift .task(id: search))
     clearTimeout(anyoneTimer);
     const q = v.trim();
@@ -4605,9 +4613,7 @@ const SendRobuxSheet = (() => {
       const found = await robloxPeopleSearch(q).catch(() => []);
       if (seq !== anyoneSeq || to !== null) return;
       anyone = found;
-      render();
-      const i = $("sendBody") && $("sendBody").querySelector("input");
-      if (i) { i.focus(); i.setSelectionRange(search.length, search.length); }
+      redrawList();
     }, 450);
   }
   function pick(id) {
