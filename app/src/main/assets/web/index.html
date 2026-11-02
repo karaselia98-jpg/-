@@ -3396,6 +3396,14 @@ const Me = (() => {
   let sortOpen = false;
   let outfitDialog = null;  // { kind: "name" | "details" | "rename", outfit? }
   const SORTS = ["Relevance", "Price: low to high", "Price: high to low"];
+  // AppearanceView.swift `sorted`: relevance keeps Roblox's order; price sorts put unpriced items last
+  const sortItems = list => {
+    if (sort === "Relevance" || !list) return list || [];
+    const arr = [...list];
+    if (sort === "Price: low to high") arr.sort((a, b) => (a.price ?? Number.MAX_SAFE_INTEGER) - (b.price ?? Number.MAX_SAFE_INTEGER));
+    else arr.sort((a, b) => (b.price ?? -1) - (a.price ?? -1));
+    return arr;
+  };
   const RECENT_KEY = "recentSearches";
   const readRecents = () => { try { return JSON.parse(localStorage.getItem(RECENT_KEY) || "[]"); } catch (e) { return []; } };
   const writeRecents = list => { try { localStorage.setItem(RECENT_KEY, JSON.stringify(list)); } catch (e) {} };
@@ -3472,7 +3480,7 @@ const Me = (() => {
     const front = category === "All" && !sub;
     const heading = front ? "Recommended For You" : (sub || category);
     if (query) {
-      const shownList = marketItems || [];
+      const shownList = sortItems(marketItems || []);
       const cards = shownList.map(it => `<button class="me-item" data-m-act="openitem" data-v="${it.id}">
         <div class="me-ithumb">${it.thumb ? `<img src="${escapeHtml(it.thumb)}" alt="">` : ""}</div>
         <div class="me-iname">${escapeHtml(it.name)}</div>
@@ -3488,9 +3496,9 @@ const Me = (() => {
       if (!L.items.length) return `<div class="me-h">${esc(heading)}</div><div class="me-msg">Roblox sent nothing to show.</div>`;
       const more = L.next ? `<div style="text-align:center;margin-top:16px"><button class="me-clear" data-m-act="morecat"${L.busy ? " disabled" : ""}>${L.busy ? "Loading…" : "Load more"}</button></div>` : "";
       return `${category === "Backgrounds" ? `<div style="padding-top:10px">${promoBanner()}</div>` : ""}
-      <div class="me-h">${esc(heading)}</div><div class="me-grid">${itemCards(L.items)}</div>${more}`;
+      <div class="me-h">${esc(heading)}</div><div class="me-grid">${itemCards(sortItems(L.items))}</div>${more}`;
     }
-    const frontList = marketItems || [];
+    const frontList = sortItems(marketItems || []);
     const frontCards = frontList.map(it => `<button class="me-item" data-m-act="openitem" data-v="${it.id}">
         <div class="me-ithumb">${it.thumb ? `<img src="${escapeHtml(it.thumb)}" alt="">` : ""}</div>
         <div class="me-iname">${escapeHtml(it.name)}</div>
