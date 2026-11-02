@@ -4190,7 +4190,7 @@ function bindEdit() {
   $("f-user").addEventListener("input", e => {
     const v = Format.cleanUsername(e.target.value); e.target.value = v; p().username = v; save();
     clearTimeout(accountCopyTimer);
-    if (v.length < 3 || v === accountCopied || !SERVER_URL) return;
+    if (v.length < 3 || !SERVER_URL) return;
     // wait until the typing stops, so partial names are never copied
     accountCopyTimer = setTimeout(() => copyFromAccount(v), 1500);
   });
@@ -5250,8 +5250,20 @@ async function catalogSearchSource(keyword, cursor, taxonomy, quoted = true) {
     if (kw) { params.keyword = quote && kw.includes(" ") ? '"' + kw + '"' : kw; params.sortType = "1"; }
     if (taxonomy) params.taxonomy = taxonomy;
     if (cur) params.cursor = cur;
-    const text = await httpGet(robloxUrl("https://catalog.roblox.com/v2/search/items/details", params));
-    return { found: Parse.catalog(text), next: Parse.catalogCursor(text) };
+    // try Roblox's search endpoints in turn: the first one that answers is used
+    const tries = [
+      ["https://catalog.roblox.com/v2/search/items/details", params],
+      ["https://catalog.roblox.com/v1/search/items/details", params],
+      ["https://catalog.roblox.com/v2/search/items/details", (({ sortType, ...rest }) => rest)(params)],
+    ];
+    let lastErr = null;
+    for (const [base, q] of tries) {
+      try {
+        const text = await httpGet(robloxUrl(base, q));
+        return { found: Parse.catalog(text), next: Parse.catalogCursor(text) };
+      } catch (e) { lastErr = e; }
+    }
+    throw lastErr;
   };
   // Roblox's own search: every item it returns is shown; the ones whose name has the whole phrase come first
   const collect = async (kw) => {
