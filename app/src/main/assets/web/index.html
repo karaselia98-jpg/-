@@ -5090,6 +5090,12 @@ async function loadMyAvatar() {
         loadedFor = user;
         return;
       }
+      // the avatar is the one copied or worn last (kept as the definition): draw that, never the username's current look
+      if (seq !== lookSeq) return;
+      loadedFor = user;
+      st.profile.drawn = null;
+      previewWornNow(st, 0);
+      return;
     }
   } catch (e) {}
   // show the last picture and background at once, while the server answers
