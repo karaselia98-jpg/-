@@ -3069,6 +3069,7 @@ const ItemPage = (() => {
       Store.tryOn(st, null);
     }
     save();
+    prepareOwned([it]);
     previewWorn(st);
     refreshOpenScreens();
   }
@@ -4931,6 +4932,15 @@ const lookDb = (() => {
 let drawNote = "";
 // Swift Store.drawSoon / redraw: wait 1.5 s after the last change, check the hourly budget, skip a look that is
 // already drawn, and try again when the server is busy.
+// Ask the server to draw owned single items in the background, so wearing them later is instant.
+function prepareOwned(items, base) {
+  if (!SERVER_URL || !items || !items.length) return;
+  const list = items.filter(i => i && !i.bundle && i.id != null).map(i => ({ id: i.id, bundle: false, kind: i.kind ?? null }));
+  if (!list.length) return;
+  fetch(SERVER_URL + "/prepare", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ base: base || st.profile.definition || lookBase, items: list }) }).catch(() => {});
+}
+
 function previewWorn(st) {
   clearTimeout(previewTimer);
   // short wait so several taps become one redraw, but the change starts at once
@@ -5276,6 +5286,7 @@ async function copyAvatarFrom(name) {
   if (bundleIds.length) Object.assign(pics, Parse.images(await httpGet(robloxUrl("https://thumbnails.roblox.com/v1/bundles/thumbnails", { bundleIds: bundleIds.join(","), size: "420x420", format: "Png" })).catch(() => "{}")));
   for (const i of items) i.thumb = pics[i.id] || null;
   Profile.adopt(st.profile, items);
+  prepareOwned(items, look.definition);
   st.profile.definition = look.definition;
   lookBase = look.definition;
   // the username typed here becomes this profile's own name, and its avatar is the one shown
