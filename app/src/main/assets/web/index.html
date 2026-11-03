@@ -4219,6 +4219,8 @@ function bindEdit() {
       $("f-user").value = st.profile.username;
       $("f-name").value = st.profile.displayName;
       $("f-copystatus").textContent = "Copied " + st.profile.username + "'s avatar and " + n + " worn items.";
+      // the friends that came with the username show in the list under Friends on Home, and on Home
+      if (typeof fillFriendRows === "function") fillFriendRows();
       if (typeof Me !== "undefined" && Me.render) Me.render();
       if (typeof Home !== "undefined" && Home.render) Home.render();
       if (typeof renderMenu === "function") renderMenu();
