@@ -4990,6 +4990,8 @@ function prepareOwned(items, base) {
 // Draw ahead the outfits with one piece taken off, so taking a piece off is as quick as putting it on.
 // Only for outfits without bundles (the server draws bundles as Roblox lists them, which is not known here).
 function prepareRemovals(st, base) {
+  // paused: these background draws were slowing the server down while testing one piece at a time
+  return;
   if (!SERVER_URL || !base) return;
   const worn = st.profile.items
     .filter(i => { const o = Profile.owns(st.profile, i); return !!(o && o.wearing); })
