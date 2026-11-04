@@ -5007,6 +5007,11 @@ function previewWorn(st) {
   // short wait so several taps become one redraw, but the change starts at once
   previewTimer = setTimeout(() => previewWornNow(st, 0), 350);
 }
+const ACCESSORY_KINDS = [8, 41, 42, 43, 44, 45, 46, 47];
+function accessoryIds(st) {
+  return st.profile.items.filter(i => { const o = Profile.owns(st.profile, i); return !!(o && o.wearing) && !i.bundle && ACCESSORY_KINDS.includes(i.kind); })
+    .map(i => i.id);
+}
 function wornSignature(st) {
   // what is worn AND the body: a changed build must redraw even when the clothes are the same
   const worn = st.profile.items.filter(i => { const o = Profile.owns(st.profile, i); return !!(o && o.wearing); })
@@ -5025,6 +5030,9 @@ async function previewWornNow(st, tries) {
   if (previewBusy && Date.now() - previewBusySince < 40000) { clearTimeout(previewTimer); previewTimer = setTimeout(() => previewWornNow(st, tries), 2000); return; }
   const sig = wornSignature(st);
   if (sig === st.profile.drawn && tries === 0) return;
+  const wornNow = accessoryIds(st);
+  const boxes = st.profile.handleBoxes || {};
+  for (const id of (st.profile.drawnWorn || [])) if (!wornNow.includes(id) && boxes[id]) AvatarStage.hideBox(boxes[id]);
   // a look drawn before in this session comes back at once (undo, redo, wearing the same things again)
   const cacheKey = hashText(JSON.stringify(base)) + "|" + sig;
   if (!modelCache[cacheKey]) {
@@ -5033,6 +5041,7 @@ async function previewWornNow(st, tries) {
   if (modelCache[cacheKey]) {
     await AvatarStage.setModel(modelCache[cacheKey]);
     st.profile.drawn = sig;
+    st.profile.drawnWorn = wornNow;
     try { save(); } catch (e) {}
     return;
   }
@@ -5064,6 +5073,9 @@ async function previewWornNow(st, tries) {
     if (!r.ok || !body.model || !body.model.obj) throw new Error(r.status === 429 ? "busy" : "no model");
     if (seq !== previewSeq) { previewBusy = false; return; }
     window.lastLook = body;
+    // one accessory and one rigid part in the model: that part is the accessory
+    const hs = body.model.handles ? Object.values(body.model.handles) : [];
+    if (wornNow.length === 1 && hs.length === 1) st.profile.handleBoxes = { ...(st.profile.handleBoxes || {}), [wornNow[0]]: hs[0] };
     if (body.image) probePic(body.image);
     const [obj, mtl] = await Promise.all([
       fetch(body.model.obj, { signal: ctl.signal }).then(r => r.text()),
@@ -5078,6 +5090,7 @@ async function previewWornNow(st, tries) {
     if (keys.length > 20) delete modelCache[keys[0]];
     await AvatarStage.setModel(payload);
     st.profile.drawn = sig;
+    st.profile.drawnWorn = wornNow;
     try { save(); } catch (e) {}
     drew = true;
     showDrawNote("");
@@ -6286,7 +6299,22 @@ const AvatarStage = (() => {
     c.getContext("2d").putImageData(new ImageData(bytes, size, size), 0, 0);
     return c.toDataURL("image/png");
   }
-  return { setModel, clear, setPersonModel, clearPerson, refresh: refreshSoon, angleNow: () => angle, faceFront, snapshot };
+  // a rigid accessory (cap, visor...) is hidden at once by where it sits in the model: no new look from the server
+  function hideBox(box) {
+    if (!model || !box || !box.min || !box.max) return;
+    const hit = p => {
+      const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+      for (const i of p.indices) for (let k = 0; k < 3; k++) {
+        const x = model.positions[i * 3 + k];
+        if (x < lo[k]) lo[k] = x;
+        if (x > hi[k]) hi[k] = x;
+      }
+      return [0, 1, 2].every(k => Math.abs(lo[k] - box.min[k]) < 0.02 && Math.abs(hi[k] - box.max[k]) < 0.02);
+    };
+    model = { ...model, parts: model.parts.filter(p => !hit(p)) };
+    refreshSoon();
+  }
+  return { setModel, clear, setPersonModel, clearPerson, refresh: refreshSoon, angleNow: () => angle, faceFront, snapshot, hideBox };
 })();
 </script>
 </body>
