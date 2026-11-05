@@ -5584,7 +5584,11 @@ async function copyAvatarFrom(name, full = true) {
   if (fr !== null) st.profile.friends = fr;
   if (fo !== null) st.profile.followers = fo;
   if (fg !== null) st.profile.following = fg;
-  const theirFriends = friendsRes ? Parse.users(friendsRes) : [];
+  // read each friend on its own: one odd entry must not hide the whole list
+  const theirFriends = friendsRes ? ((json(friendsRes) || {}).data || [])
+    .filter(u => u && isNum(u.id) && isStr(u.name))
+    .map(u => ({ id: u.id, name: u.name, displayName: u.displayName || u.name, verified: !!u.hasVerifiedBadge })) : [];
+  console.log("[friends] listed " + theirFriends.length);
   if (theirFriends.length) {
     const faces = await httpGet("https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=" + theirFriends.map(f => f.id).join(",") + "&size=150x150&format=Png")
       .then(Parse.images, () => ({})).catch(() => ({}));
