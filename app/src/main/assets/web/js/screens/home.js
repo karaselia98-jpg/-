@@ -50,8 +50,8 @@ const Home = (() => {
   }
 
   function render() {
-    const tabs = document.querySelector(".htabs");
-    if (tabs && !document.getElementById("homeWordmarkImg")) tabs.insertAdjacentHTML("beforebegin", '<div class="home-wordmark-bar"><img id="homeWordmarkImg" alt="Roblox"></div>');
+    const homeScreen = document.getElementById("s-home");
+    if (homeScreen && !document.getElementById("homeWordmarkImg")) homeScreen.insertAdjacentHTML("afterbegin", '<div class="home-wordmark-bar"><img id="homeWordmarkImg" alt="Roblox"></div>');
     const logo = document.getElementById("homeWordmarkImg");
     if (logo && !logo.src.startsWith("data:")) fetch("wordmark.png.b64").then(r => r.text()).then(b64 => { logo.src = "data:image/png;base64," + b64.trim(); }).catch(() => {});
     $("homeBody").innerHTML = tab === "charts" ? charts() : forYou();
