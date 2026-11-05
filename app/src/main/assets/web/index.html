@@ -5585,8 +5585,8 @@ async function copyAvatarFrom(name, full = true) {
   if (fo !== null) st.profile.followers = fo;
   if (fg !== null) st.profile.following = fg;
   // read each friend on its own: one odd entry must not hide the whole list
-  const theirFriends = friendsRes ? ((json(friendsRes) || {}).data || [])
-    .filter(u => u && isNum(u.id) && isStr(u.name))
+  const theirFriends = friendsRes ? ((typeof friendsRes === "string" ? JSON.parse(friendsRes) : friendsRes).data || [])
+    .filter(u => u && typeof u.id === "number" && typeof u.name === "string")
     .map(u => ({ id: u.id, name: u.name, displayName: u.displayName || u.name, verified: !!u.hasVerifiedBadge })) : [];
   console.log("[friends] listed " + theirFriends.length);
   if (theirFriends.length) {
