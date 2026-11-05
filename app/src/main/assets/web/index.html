@@ -4649,6 +4649,7 @@ const SendRobuxSheet = (() => {
   let anyone = [];        // Roblox users the search finds (Swift `anyone`)
   let anyoneTimer = null;
   let anyoneSeq = 0;
+  const anyoneCache = new Map();  // typed word -> users Roblox found
 
   const friends = () => st.profile.friendList;
   const amountValue = () => Format.number(amount);
@@ -4760,9 +4761,15 @@ const SendRobuxSheet = (() => {
     if (q.length < 3) { anyone = []; return; }
     const seq = ++anyoneSeq;
     anyoneTimer = setTimeout(async () => {
-      const found = await robloxPeopleSearch(q).catch(() => []);
+      // same word again: show what came back before (Roblox limits how often it answers)
+      let found = anyoneCache.get(q) || null;
+      for (let tries = 0; !found && tries < 2; tries++) {
+        if (tries) await new Promise(r => setTimeout(r, 1500));
+        found = await robloxPeopleSearch(q).catch(() => null);
+      }
+      if (found) anyoneCache.set(q, found);
       if (seq !== anyoneSeq || to !== null) return;
-      anyone = found;
+      anyone = found || [];
       redrawList();
     }, 450);
   }
