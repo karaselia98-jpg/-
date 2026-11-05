@@ -5584,6 +5584,13 @@ async function copyAvatarFrom(name, full = true) {
   if (fr !== null) st.profile.friends = fr;
   if (fo !== null) st.profile.followers = fo;
   if (fg !== null) st.profile.following = fg;
+  // the copied user's own profile goes into Friends on Home too (like a friend added in Settings)
+  if (!st.profile.friendList.some(x => x.id === user.id)) {
+    const selfFace = await httpGet("https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=" + user.id + "&size=150x150&format=Png")
+      .then(Parse.images, () => ({})).catch(() => ({}));
+    st.profile.friendList.unshift({ id: user.id, name: user.name, displayName: user.displayName || user.name, verified: !!user.verified,
+      headshot: selfFace[user.id] || null, bio: "", friends: null, followers: null, following: null });
+  }
   const theirFriends = friendsRes ? Parse.users(friendsRes) : [];
   if (theirFriends.length) {
     const faces = await httpGet("https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=" + theirFriends.map(f => f.id).join(",") + "&size=150x150&format=Png")
