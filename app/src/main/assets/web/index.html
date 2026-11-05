@@ -4284,8 +4284,8 @@ function bindEdit() {
     $("f-addbtn").disabled = true;
     $("f-friendstatus").textContent = "Adding…";
     try {
-      const added = await addFriendSource(who);
-      $("f-friendstatus").textContent = added ? "Added " + who + "." : who + " is already in your friends.";
+      const added = await addFriendsOf(who);
+      $("f-friendstatus").textContent = added ? "Added " + added + " friends of " + who + "." : who + "'s friends are already in your list.";
       $("f-addfriend").value = "";
       fillFriendRows();
       Home.render();
@@ -5630,6 +5630,26 @@ async function robloxFriendDetails(id, name) {
     wearing: worn.map(i => ({ id: i.id, bundle: !!i.bundle, name: i.name, thumb: shots[i.id] || null })),
     favorites: favorites.map(g => ({ id: g.id, name: g.name, icon: g.icon || null })),
   };
+}
+// Typing a username here adds that user's friends (not the user) to Friends on Home and Chat
+async function addFriendsOf(name) {
+  const user = Parse.user(await robloxPost("https://users.roblox.com/v1/usernames/users", { usernames: [name], excludeBannedUsers: true }));
+  if (!user) throw new Error("No Roblox user with that name.");
+  const raw = await httpGet("https://friends.roblox.com/v1/users/" + user.id + "/friends?limit=50");
+  const list = ((typeof raw === "string" ? JSON.parse(raw) : raw).data || [])
+    .filter(u => u && typeof u.id === "number" && typeof u.name === "string");
+  if (!list.length) throw new Error(name + " has no friends that Roblox shows.");
+  const faces = await httpGet("https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=" + list.map(u => u.id).join(",") + "&size=150x150&format=Png")
+    .then(Parse.images, () => ({})).catch(() => ({}));
+  let added = 0;
+  for (const u of list) {
+    if (st.profile.friendList.some(x => x.id === u.id)) continue;
+    st.profile.friendList.push({ id: u.id, name: u.name, displayName: u.displayName || u.name, verified: !!u.hasVerifiedBadge,
+      headshot: faces[u.id] || null, bio: "", friends: null, followers: null, following: null });
+    added++;
+  }
+  save();
+  return added;
 }
 async function robloxAddFriend(name) {
   const user = Parse.user(await robloxPost("https://users.roblox.com/v1/usernames/users", { usernames: [name], excludeBannedUsers: true }));
