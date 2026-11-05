@@ -4751,27 +4751,39 @@ const SendRobuxSheet = (() => {
     const l = $("sendList");
     if (l) l.innerHTML = listRows();
   }
+  // one request per word at a time, results kept, retries on Roblox's limit (429) with a longer wait
+  const anyoneBusy = new Map();  // typed word -> the search still running for it
+  function peopleFor(q, alive) {
+    if (anyoneCache.has(q)) return Promise.resolve(anyoneCache.get(q));
+    if (anyoneBusy.has(q)) return anyoneBusy.get(q);
+    const p = (async () => {
+      for (let tries = 0; tries < 3 && alive(); tries++) {
+        try { const found = await robloxPeopleSearch(q); anyoneCache.set(q, found); return found; }
+        catch (e) {
+          if (tries === 2) break;
+          await new Promise(r => setTimeout(r, /429/.test(e && e.message) ? 3000 : 1500));
+        }
+      }
+      return null;
+    })().finally(() => anyoneBusy.delete(q));
+    anyoneBusy.set(q, p);
+    return p;
+  }
   function setSearch(v) {
     search = v;
     const body = $("sendBody");
     if (body && to === null) redrawList();
-    // Roblox search waits 450 ms after typing and needs 3 letters (Swift .task(id: search))
+    // Roblox search waits 700 ms after typing and needs 3 letters (Swift .task(id: search))
     clearTimeout(anyoneTimer);
     const q = v.trim();
     if (q.length < 3) { anyone = []; return; }
     const seq = ++anyoneSeq;
     anyoneTimer = setTimeout(async () => {
-      // same word again: show what came back before (Roblox limits how often it answers)
-      let found = anyoneCache.get(q) || null;
-      for (let tries = 0; !found && tries < 2; tries++) {
-        if (tries) await new Promise(r => setTimeout(r, 1500));
-        found = await robloxPeopleSearch(q).catch(() => null);
-      }
-      if (found) anyoneCache.set(q, found);
-      if (seq !== anyoneSeq || to !== null) return;
+      const found = await peopleFor(q, () => seq === anyoneSeq);
+      if (seq !== anyoneSeq || to !== null) return;   // an older word: its answer is dropped
       anyone = found || [];
       redrawList();
-    }, 450);
+    }, 700);
   }
   function pick(id) {
     to = friends().find(f => String(f.id) === String(id)) || anyone.find(f => String(f.id) === String(id)) || null;
