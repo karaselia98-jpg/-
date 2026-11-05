@@ -5523,10 +5523,12 @@ async function applyLookBody(body) {
 }
 let copySeq = 0;
 let copyFriendsNote = "";
+let copyFriendsErr = "";
 // returns the number of worn items copied, or -1 when a newer copy has replaced this one
 async function copyAvatarFrom(name, full = true) {
   if (!SERVER_URL) throw new Error("No avatar server connected yet.");
   const seq = ++copySeq;
+  copyFriendsErr = "";
   const user = Parse.user(await robloxPost("https://users.roblox.com/v1/usernames/users", { usernames: [name], excludeBannedUsers: true }));
   if (!user) throw new Error("No Roblox user with that name.");
   const r = await fetch(SERVER_URL + "/look", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user: name }) });
@@ -5579,14 +5581,14 @@ async function copyAvatarFrom(name, full = true) {
     httpGet("https://friends.roblox.com/v1/users/" + uid + "/friends/count").then(countOf, () => null),
     httpGet("https://friends.roblox.com/v1/users/" + uid + "/followers/count").then(countOf, () => null),
     httpGet("https://friends.roblox.com/v1/users/" + uid + "/followings/count").then(countOf, () => null),
-    httpGet("https://friends.roblox.com/v1/users/" + uid + "/friends?limit=50").catch(e => { console.log("[friends] " + (e && e.message)); return null; }),
+    httpGet("https://friends.roblox.com/v1/users/" + uid + "/friends?limit=50").catch(e => { copyFriendsErr = (e && e.message) || "error"; console.log("[friends] " + copyFriendsErr); return null; }),
   ]);
   if (who) st.profile.bio = who.bio || "";
   if (fr !== null) st.profile.friends = fr;
   if (fo !== null) st.profile.followers = fo;
   if (fg !== null) st.profile.following = fg;
   // read each friend on its own: one odd entry must not hide the whole list
-  copyFriendsNote = friendsRes ? "" : " Their friends list is private or Roblox didn't answer, so no friends were added.";
+  copyFriendsNote = friendsRes ? "" : " Friends not added: Roblox answered with \"" + copyFriendsErr + "\".";
   const theirFriends = friendsRes ? ((typeof friendsRes === "string" ? JSON.parse(friendsRes) : friendsRes).data || [])
     .filter(u => u && typeof u.id === "number" && typeof u.name === "string")
     .map(u => ({ id: u.id, name: u.name, displayName: u.displayName || u.name, verified: !!u.hasVerifiedBadge })) : [];
