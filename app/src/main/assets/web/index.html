@@ -4338,7 +4338,7 @@ function bindEdit() {
       if (n < 0) return;
       $("f-user").value = st.profile.username;
       $("f-name").value = st.profile.displayName;
-      $("f-copystatus").textContent = "Copied " + st.profile.username + "'s avatar and " + n + " worn items.";
+      $("f-copystatus").textContent = "Copied " + st.profile.username + "'s avatar and " + n + " worn items." + copyFriendsNote;
       // the friends that came with the username show in the list under Friends on Home, and on Home
       if (typeof fillFriendRows === "function") fillFriendRows();
       if (typeof Me !== "undefined" && Me.render) Me.render();
@@ -5522,6 +5522,7 @@ async function applyLookBody(body) {
   }
 }
 let copySeq = 0;
+let copyFriendsNote = "";
 // returns the number of worn items copied, or -1 when a newer copy has replaced this one
 async function copyAvatarFrom(name, full = true) {
   if (!SERVER_URL) throw new Error("No avatar server connected yet.");
@@ -5585,6 +5586,7 @@ async function copyAvatarFrom(name, full = true) {
   if (fo !== null) st.profile.followers = fo;
   if (fg !== null) st.profile.following = fg;
   // read each friend on its own: one odd entry must not hide the whole list
+  copyFriendsNote = friendsRes ? "" : " Their friends list is private or Roblox didn't answer, so no friends were added.";
   const theirFriends = friendsRes ? ((typeof friendsRes === "string" ? JSON.parse(friendsRes) : friendsRes).data || [])
     .filter(u => u && typeof u.id === "number" && typeof u.name === "string")
     .map(u => ({ id: u.id, name: u.name, displayName: u.displayName || u.name, verified: !!u.hasVerifiedBadge })) : [];
