@@ -51,7 +51,7 @@ const Home = (() => {
 
   function render() {
     const slot = document.querySelector("#s-home .wordmark-slot");
-    if (slot && !document.getElementById("homeWordmarkImg")) slot.innerHTML = '<img id="homeWordmarkImg" alt="Roblox">';
+    if (slot && !document.getElementById("homeWordmarkImg")) slot.innerHTML = '<img id="homeWordmarkImg" alt="Roblox" style="width:238px;height:28px;object-fit:contain;object-position:left center;display:block">';
     const logo = document.getElementById("homeWordmarkImg");
     if (logo && !logo.dataset.loaded) {
       logo.dataset.loaded = "1";
