@@ -50,10 +50,13 @@ const Home = (() => {
   }
 
   function render() {
-    const homeScreen = document.getElementById("s-home");
-    if (homeScreen && !document.getElementById("homeWordmarkImg")) homeScreen.insertAdjacentHTML("afterbegin", '<div class="home-wordmark-bar"><img id="homeWordmarkImg" alt="Roblox"></div>');
+    const slot = document.querySelector("#s-home .wordmark-slot");
+    if (slot && !document.getElementById("homeWordmarkImg")) slot.innerHTML = '<img id="homeWordmarkImg" alt="Roblox">';
     const logo = document.getElementById("homeWordmarkImg");
-    if (logo && !logo.src.startsWith("data:")) fetch("wordmark.png.b64").then(r => r.text()).then(b64 => { logo.src = "data:image/png;base64," + b64.trim(); }).catch(() => {});
+    if (logo && !logo.dataset.loaded) {
+      logo.dataset.loaded = "1";
+      fetch("wordmark.png.b64").then(r => r.text()).then(b64 => { logo.src = "data:image/png;base64," + b64.trim(); }).catch(() => {});
+    }
     $("homeBody").innerHTML = tab === "charts" ? charts() : forYou();
     document.querySelectorAll(".htabs button").forEach(b => b.classList.toggle("on", b.dataset.t === tab));
     const n = st.profile.notifications || 0;
