@@ -6157,9 +6157,7 @@ const AvatarStage = (() => {
     return { model: parsed, textures: loaded };
   }
   async function setModel(payload) {
-    // a look shown before is already parsed: reuse it instead of parsing the whole OBJ again
-    const got = (payload && payload._got) || await loadPayload(payload);
-    if (got && payload) payload._got = got;
+    const got = await loadPayload(payload);
     if (!got) { clear(); return false; }
     model = got.model;
     textures = got.textures;
