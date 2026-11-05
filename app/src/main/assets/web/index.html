@@ -4631,7 +4631,13 @@ const LedgerEditor = (() => {
 // Roblox.people (Swift): every user the keyword finds, with headshots. Needs 3+ letters.
 async function robloxPeopleSearch(keyword) {
   const data = await httpGet("https://users.roblox.com/v1/users/search?keyword=" + encodeURIComponent(keyword) + "&limit=10");
-  const users = Parse.users(data);
+  let users = Parse.users(data);
+  // a full username is also looked up exactly (the keyword search can leave out long names): it comes first
+  if (/^[A-Za-z0-9_]{3,20}$/.test(keyword)) {
+    const exact = await robloxPost("https://users.roblox.com/v1/usernames/users", { usernames: [keyword], excludeBannedUsers: true })
+      .then(t => Parse.user(t), () => null).catch(() => null);
+    if (exact) users = [exact, ...users.filter(u => u.id !== exact.id)];
+  }
   if (!users.length) return [];
   const faces = await httpGet("https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=" + users.map(u => u.id).join(",") + "&size=150x150&format=Png")
     .then(Parse.images, () => ({})).catch(() => ({}));
