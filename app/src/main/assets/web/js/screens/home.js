@@ -50,6 +50,8 @@ const Home = (() => {
   }
 
   function render() {
+    const tabs = document.querySelector(".htabs");
+    if (tabs && !document.getElementById("homeWordmark")) tabs.insertAdjacentHTML("beforebegin", '<div class="home-wordmark-bar"><span id="homeWordmark">Roblox</span></div>');
     $("homeBody").innerHTML = tab === "charts" ? charts() : forYou();
     document.querySelectorAll(".htabs button").forEach(b => b.classList.toggle("on", b.dataset.t === tab));
     const n = st.profile.notifications || 0;
