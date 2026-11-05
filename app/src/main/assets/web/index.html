@@ -5228,7 +5228,7 @@ async function previewWornNow(st, tries) {
     ]);
     const files = {};
     for (const u of body.model.textures || []) files[u.split("/").pop()] = u;
-    const payload = { obj, mtl, textures: files, bodyColors: (body.definition || {}).bodyColors };
+    const payload = { obj, mtl, textures: files, bodyColors: (body.definition || base || {}).bodyColors };
     modelCache[cacheKey] = payload;
     try { lookDb.put(cacheKey, payload); } catch (e) {}
     const keys = Object.keys(modelCache);
