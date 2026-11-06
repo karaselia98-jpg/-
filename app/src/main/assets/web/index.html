@@ -4284,8 +4284,8 @@ function bindEdit() {
     $("f-addbtn").disabled = true;
     $("f-friendstatus").textContent = "Adding…";
     try {
-      const added = await addFriendsOf(who);
-      $("f-friendstatus").textContent = added ? "Added " + added + " friends of " + who + "." : who + "'s friends are already in your list.";
+      const added = await addFriendSource(who);
+      $("f-friendstatus").textContent = added ? "Added " + who + "." : who + " is already in your friends.";
       $("f-addfriend").value = "";
       fillFriendRows();
       Home.render();
