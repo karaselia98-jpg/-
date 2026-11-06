@@ -83,6 +83,7 @@ textarea.field { padding:8px; min-height:106px; resize:none; line-height:1.3; }
 .sheetfull[hidden] { display:none; }
 /* the friend sheet rests at 82% with nothing to scroll; pulled up it fills the screen, with X at the top */
 #s-friend:not(.raised) .scroll { overflow:hidden; }
+#s-friend:not(.raised) { height:170px !important; }
 #s-friend.raised { top:48px !important; height:auto !important; inset:48px 0 0 0; transition:top .28s ease; }
 #s-friend.raised .scroll { overflow-y:auto; }
 .fclose { display:none; position:absolute; right:14px; top:10px; z-index:2; width:36px; height:36px; font-size:26px; line-height:36px; color:var(--ink); background:none; border:0; }
@@ -629,6 +630,7 @@ textarea.field { padding:8px; min-height:106px; resize:none; line-height:1.3; }
 .gsheet { position:absolute; left:0; right:0; bottom:0; height:82%; z-index:22; background:rgb(25,26,30); border-radius:16px 16px 0 0; display:flex; flex-direction:column; overflow:hidden; }
 .gsheet[hidden] { display:none; }
 .gsheet.full { top:0; height:auto; border-radius:0; }
+.gsheet:not(.full) { height:170px; }
 .ghandle { height:22px; display:flex; align-items:center; justify-content:center; flex:none; }
 .ghandle span { width:39px; height:4px; border-radius:2px; background:rgb(58,59,66); display:block; }
 .gclose { position:absolute; left:14px; top:2px; width:44px; height:44px; display:flex; align-items:center; justify-content:center; z-index:2; }
@@ -2622,6 +2624,20 @@ const GamePage = (() => {
     $("gClose").hidden = !full;
   }
 
+  (() => {
+    const sh = $("s-game");
+    let start = null;
+    sh.addEventListener("pointerdown", e => { start = { y: e.clientY }; });
+    sh.addEventListener("pointermove", e => {
+      if (!start) return;
+      const dy = e.clientY - start.y;
+      if (!full && dy < -60) { full = true; start = null; render(); }
+      else if (full && dy > 120 && sh.querySelector(".gscroll").scrollTop <= 0) { full = false; start = null; render(); }
+    });
+    const stop = () => { start = null; };
+    sh.addEventListener("pointerup", stop);
+    sh.addEventListener("pointercancel", stop);
+  })();
   function open(g, asFull = false) {
     game = g; full = asFull;
     info = null; more = null; maturity = null; slides = []; events = [];
