@@ -3750,7 +3750,7 @@ const Me = (() => {
       return `<button class="icard" data-m-act="owned" data-v="${esc(String(i.id))}" data-b="${i.bundle ? 1 : 0}" aria-label="${esc(i.name)}">
         <div class="ithumb" style="position:relative">${i.thumb ? `<img src="${esc(i.thumb)}" alt="">` : ""}${worn ? `<span class="worn-badge" aria-label="Wearing"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="#335fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>` : ""}</div>
         <div class="iname">${esc(i.name)}</div>
-        <div class="iprice">${i.price > 0 ? `<span class="ic" style="font-size:16.7px">robux</span>` : ""}${esc(Format.priceText(i.price))}</div></button>`;
+      </button>`;
     }).join("")}</div>`;
   }
   function holdsSlot(slotObj, i) {
