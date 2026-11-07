@@ -3972,7 +3972,7 @@ const Me = (() => {
       marketSource(q, undefined, queryTax).then(list => {
         if (query !== run) return;
         marketItems = list; render();
-        if (!refineWord && list.length) topicsFor(run, list).then(words => { if (query === run && !refineWord) { marketTopics = words; render(); } }).catch(() => {});
+        if (!refineWord && list.length) topicsFor(run, list).then(words => { if (query === run && !refineWord) { marketTopics = words; render(); } }).catch(e => console.log("[topics] " + (e && e.message)));
       })
         .catch(() => { if (query === run) { marketItems = []; render(); } });
     } else { marketItems = []; render(); }
@@ -5530,6 +5530,14 @@ async function catalogSearchSource(keyword, cursor, taxonomy, quoted = true) {
   };
   if (assets.length) await load("https://thumbnails.roblox.com/v1/assets", { assetIds: assets.join(","), size: "420x420", format: "Png" });
   if (bundles.length) await load("https://thumbnails.roblox.com/v1/bundles/thumbnails", { bundleIds: bundles.join(","), size: "420x420", format: "Png" });
+  // pictures Roblox still had not finished: ask again for just those, a few times (the name and price are already shown)
+  for (let again = 0; again < 3; again++) {
+    const missingA = assets.filter(id => !pics[id]), missingB = bundles.filter(id => !pics[id]);
+    if (!missingA.length && !missingB.length) break;
+    await new Promise(r => setTimeout(r, 1500));
+    if (missingA.length) await load("https://thumbnails.roblox.com/v1/assets", { assetIds: missingA.join(","), size: "420x420", format: "Png" });
+    if (missingB.length) await load("https://thumbnails.roblox.com/v1/bundles/thumbnails", { bundleIds: missingB.join(","), size: "420x420", format: "Png" });
+  }
   const out = items.map(i => ({ ...i, thumb: pics[i.id] || null }));
   out.next = next;
   return out;
