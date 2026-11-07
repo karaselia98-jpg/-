@@ -5015,7 +5015,14 @@ window.fetch = (input, init) => {
     init = Object.assign({}, init || {});
     init.headers = Object.assign({}, init.headers || {}, { "X-License": savedLicense() });
   }
-  return nativeFetch(input, init);
+  const sent = savedLicense();
+  return nativeFetch(input, init).then(r => {
+    // the key ran out (or was taken away) while the app was open: ask for a new one, like on first start
+    if (url.startsWith(SERVER_URL) && r.status === 403) {
+      r.clone().json().then(b => { if (b && b.error === "license" && savedLicense() === sent) showLicenseGate("Your key has expired. Enter a new one."); }).catch(() => {});
+    }
+    return r;
+  });
 };
 // Shows the key screen when the server asks for a key (or when none is saved yet)
 function showLicenseGate(message) {
