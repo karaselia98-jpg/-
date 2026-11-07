@@ -1866,7 +1866,7 @@ function wear(p, item, on = true) {
 }
 
 function adopt(p, copiedItems) {
-  p.items = p.items.filter(old => !(old.copied === true && !copiedItems.some(c => same(c, old))));
+  // items from earlier copies stay owned; only what is worn changes to the new avatar
   for (const i of p.items) i.wearing = false;
   for (const item of copiedItems) {
     if (!owns(p, item)) p.items.push({ ...item, copied: true });
